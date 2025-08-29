@@ -2,6 +2,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import formidable from 'formidable'
+import sharp from 'sharp'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -59,8 +60,23 @@ export default defineEventHandler(async (event) => {
     const newFileName = `${randomUUID()}.${fileExtension}`
     const newFilePath = join(uploadDir, newFileName)
     
-    // 移动文件到新位置
-    await fs.rename(file.filepath, newFilePath)
+    // 使用 sharp 压缩图片至 100KB 左右（根据质量和尺寸估算）
+    try {
+      await sharp(file.filepath)
+        .resize({ width: 1024, withoutEnlargement: true }) // 限制宽度，避免过大
+        .jpeg({ quality: 80, mozjpeg: true })
+        .toFile(newFilePath)
+    } catch (err) {
+      console.error('图片压缩失败，回退为原图保存:', err)
+      // 如果压缩失败则直接移动原文件
+      await fs.rename(file.filepath, newFilePath)
+    } finally {
+      // 删除临时文件（sharp 完成后源文件仍存在）
+      try { await fs.unlink(file.filepath) } catch {}
+    }
+    
+    // 获取压缩后文件大小
+    const { size: compressedSize } = await fs.stat(newFilePath)
     
     // 返回文件信息
     const fileUrl = `/uploads/${newFileName}`
