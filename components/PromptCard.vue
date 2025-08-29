@@ -5,12 +5,21 @@
       <n-button
         size="small"
         circle
-        quaternary
         :type="prompt.isFavorited ? 'warning' : 'default'"
+        :class="{
+          'bg-yellow-400 text-white hover:bg-yellow-500': prompt.isFavorited,
+          'bg-white/80 text-gray-600 hover:bg-yellow-100': !prompt.isFavorited
+        }"
         @click="$emit('toggleFavorite', prompt)"
       >
         <template #icon>
-          <n-icon :component="prompt.isFavorited ? StarIcon : StarOutlineIcon" />
+          <n-icon 
+            :component="prompt.isFavorited ? StarIcon : StarOutlineIcon" 
+            :class="{
+              'text-white': prompt.isFavorited,
+              'text-gray-600': !prompt.isFavorited
+            }"
+          />
         </template>
       </n-button>
     </div>

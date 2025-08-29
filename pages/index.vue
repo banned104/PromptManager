@@ -84,13 +84,33 @@
         </template>
       </n-empty>
     </div>
+
+    <!-- 返回顶部按钮 -->
+    <transition name="fade">
+      <div 
+        v-show="showBackToTop" 
+        class="fixed bottom-6 right-6 z-50"
+      >
+        <n-button
+          circle
+          size="large"
+          type="primary"
+          @click="scrollToTop"
+          class="shadow-lg"
+        >
+          <template #icon>
+            <n-icon><ChevronUpIcon /></n-icon>
+          </template>
+        </n-button>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon } from '@vicons/ionicons5'
 
 // 类型定义
 interface Prompt {
@@ -108,6 +128,7 @@ interface Prompt {
 const searchQuery = ref('')
 const sortOrder = ref<'asc' | 'desc'>('desc') // 默认最新优先
 const showFavoritesOnly = ref(false) // 是否只显示收藏
+const showBackToTop = ref(false) // 是否显示返回顶部按钮
 const message = useMessage()
 
 // 获取数据
@@ -184,6 +205,27 @@ const handleToggleFavorite = async (prompt: Prompt) => {
   }
 }
 
+// 返回顶部相关方法
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+
+const handleScroll = () => {
+  showBackToTop.value = window.scrollY > 300
+}
+
+// 生命周期
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
 const handleEdit = (prompt: Prompt) => {
   navigateTo(`/edit/${prompt.id}`)
 }
@@ -205,6 +247,18 @@ useHead({
   title: 'Prompt 管理器'
 })
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
 
 <style scoped>
 .container {
