@@ -2,6 +2,8 @@
 
 一个基于 **Vue 3 + Nuxt 3 + TypeScript + SQLite** 的图片 Prompt 管理器，支持 Prompt 保存、模糊搜索、图片上传与展示，并使用 **Naive UI** 与 **Tailwind CSS** 实现现代化界面。
 
+<img src=".assets/202508300506413.png" alt="image-20250830050641175" style="zoom:50%;" />
+
 ## 技术栈
 
 | 层        | 主要技术 |
@@ -94,7 +96,7 @@ DATABASE_URL="file:./prisma/dev.db"
 
 
 
-          
+
 基于你现有的 Vue + Nuxt.js + TypeScript + SQLite 的 Prompt 管理器项目，我建议以下功能扩展来提升易用性和稳定性：
 
 ## 🚀 核心功能增强
