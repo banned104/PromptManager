@@ -35,8 +35,11 @@
     </div>
     
     <!-- 时间信息 -->
-    <div class="text-xs text-gray-400 mb-4">
-      创建时间: {{ formatDate(prompt.createdAt) }}
+    <div class="flex justify-between text-xs text-gray-400 mb-4">
+      <span>创建: {{ formatDate(prompt.createdAt) }}</span>
+      <span v-if="prompt.updatedAt !== prompt.createdAt" class="text-gray-300">
+        更新: {{ formatDate(prompt.updatedAt) }}
+      </span>
     </div>
     
     <!-- 操作按钮 -->
@@ -113,13 +116,26 @@ const parsedTags = computed(() => {
 
 // 方法
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) {
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } else if (diffDays === 1) {
+    return '昨天'
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    return date.toLocaleDateString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit'
+    })
+  }
 }
 
 const handleImageError = (event: Event) => {

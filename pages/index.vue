@@ -3,6 +3,26 @@
     <div class="mb-6">
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Prompt 管理器</h1>
       
+      <!-- 工具栏 -->
+      <div class="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm border">
+        <div class="flex gap-2">
+          <n-button
+            :type="sortOrder === 'desc' ? 'primary' : 'default'"
+            @click="toggleSortOrder"
+            size="small"
+          >
+            <template #icon>
+              <n-icon :component="sortOrder === 'desc' ? TimeIcon : TimeReverseIcon" />
+            </template>
+            {{ sortOrder === 'desc' ? '最新优先' : '最旧优先' }}
+          </n-button>
+        </div>
+        
+        <div class="text-sm text-gray-500">
+          共 {{ totalCount }} 个 Prompt
+        </div>
+      </div>
+      
       <!-- 搜索栏 -->
       <div class="flex gap-4 mb-4">
         <n-input
@@ -58,7 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon } from '@vicons/ionicons5'
 
 // 类型定义
 interface Prompt {
@@ -73,6 +93,7 @@ interface Prompt {
 
 // 响应式数据
 const searchQuery = ref('')
+const sortOrder = ref<'asc' | 'desc'>('desc') // 默认最新优先
 const message = useMessage()
 
 // 获取数据
@@ -82,21 +103,37 @@ const { data: promptsData, pending, refresh } = await useFetch<{success: boolean
 const displayPrompts = computed(() => {
   if (!promptsData.value?.data) return []
   
-  if (!searchQuery.value.trim()) {
-    return promptsData.value.data
+  let filteredPrompts = promptsData.value.data
+  
+  // 搜索过滤
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filteredPrompts = filteredPrompts.filter(prompt => 
+      prompt.title.toLowerCase().includes(query) ||
+      prompt.content.toLowerCase().includes(query) ||
+      (prompt.tags && prompt.tags.toLowerCase().includes(query))
+    )
   }
   
-  const query = searchQuery.value.toLowerCase()
-  return promptsData.value.data.filter(prompt => 
-    prompt.title.toLowerCase().includes(query) ||
-    prompt.content.toLowerCase().includes(query) ||
-    (prompt.tags && prompt.tags.toLowerCase().includes(query))
-  )
+  // 时间排序
+  return [...filteredPrompts].sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime()
+    const dateB = new Date(b.createdAt).getTime()
+    return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB
+  })
+})
+
+const totalCount = computed(() => {
+  return promptsData.value?.data?.length || 0
 })
 
 // 方法
 const handleSearch = () => {
   // 搜索逻辑已在计算属性中处理
+}
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
 }
 
 const handleEdit = (prompt: Prompt) => {

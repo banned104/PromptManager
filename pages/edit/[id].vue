@@ -107,8 +107,8 @@
 
           <!-- 标签 -->
           <n-form-item label="标签">
-            <n-dynamic-tags
-              v-model:value="formData.tags"
+            <SmartTagInput
+              v-model="formData.tags"
               placeholder="添加标签"
             />
           </n-form-item>

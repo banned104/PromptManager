@@ -59,8 +59,8 @@
 
         <!-- 标签 -->
         <n-form-item label="标签">
-          <n-dynamic-tags
-            v-model:value="formData.tags"
+          <SmartTagInput
+            v-model="formData.tags"
             placeholder="添加标签"
           />
         </n-form-item>
@@ -94,7 +94,6 @@ import {
   NFormItem,
   NInput,
   NUpload,
-  NDynamicTags,
   NButton,
   NSpace,
   NBreadcrumb,
@@ -102,7 +101,6 @@ import {
   useMessage,
   type FormInst,
   type UploadFileInfo
-
 } from 'naive-ui'
 
 import { useClipboardImage } from '@/composables/useClipboardImage'
