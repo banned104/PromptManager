@@ -1,5 +1,19 @@
 <template>
   <n-card class="prompt-card" hoverable>
+    <!-- 收藏按钮 -->
+    <div class="absolute top-2 right-2 z-10">
+      <n-button
+        size="small"
+        circle
+        quaternary
+        :type="prompt.isFavorited ? 'warning' : 'default'"
+        @click="$emit('toggleFavorite', prompt)"
+      >
+        <template #icon>
+          <n-icon :component="prompt.isFavorited ? StarIcon : StarOutlineIcon" />
+        </template>
+      </n-button>
+    </div>
     <!-- 图片展示 -->
     <div v-if="prompt.imagePath" class="mb-4">
       <img 
@@ -81,7 +95,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { NCard, NTag, NSpace, NButton, NButtonGroup, NIcon, NPopconfirm } from 'naive-ui'
-import { Eye as EyeIcon, Create as EditIcon, Trash as DeleteIcon } from '@vicons/ionicons5'
+import { Eye as EyeIcon, Create as EditIcon, Trash as DeleteIcon, Star as StarIcon, StarOutline as StarOutlineIcon } from '@vicons/ionicons5'
 
 // Props
 interface Prompt {
@@ -90,6 +104,7 @@ interface Prompt {
   content: string
   imagePath?: string
   tags?: string
+  isFavorited: boolean
   createdAt: string
   updatedAt: string
 }
@@ -102,6 +117,7 @@ const props = defineProps<{
 defineEmits<{
   edit: [prompt: Prompt]
   delete: [prompt: Prompt]
+  toggleFavorite: [prompt: Prompt]
 }>()
 
 // 计算属性
@@ -153,6 +169,7 @@ const viewDetail = () => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .line-clamp-2 {

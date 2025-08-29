@@ -16,6 +16,17 @@
             </template>
             {{ sortOrder === 'desc' ? '最新优先' : '最旧优先' }}
           </n-button>
+          
+          <n-button
+            :type="showFavoritesOnly ? 'warning' : 'default'"
+            @click="toggleFavoritesFilter"
+            size="small"
+          >
+            <template #icon>
+              <n-icon :component="StarIcon" />
+            </template>
+            {{ showFavoritesOnly ? '显示全部' : '筛选收藏' }}
+          </n-button>
         </div>
         
         <div class="text-sm text-gray-500">
@@ -59,6 +70,7 @@
         :prompt="prompt"
         @edit="handleEdit"
         @delete="handleDelete"
+        @toggle-favorite="handleToggleFavorite"
       />
     </div>
 
@@ -78,7 +90,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon } from '@vicons/ionicons5'
 
 // 类型定义
 interface Prompt {
@@ -87,6 +99,7 @@ interface Prompt {
   content: string
   imagePath?: string
   tags?: string
+  isFavorited: boolean
   createdAt: string
   updatedAt: string
 }
@@ -94,6 +107,7 @@ interface Prompt {
 // 响应式数据
 const searchQuery = ref('')
 const sortOrder = ref<'asc' | 'desc'>('desc') // 默认最新优先
+const showFavoritesOnly = ref(false) // 是否只显示收藏
 const message = useMessage()
 
 // 获取数据
@@ -104,6 +118,11 @@ const displayPrompts = computed(() => {
   if (!promptsData.value?.data) return []
   
   let filteredPrompts = promptsData.value.data
+  
+  // 收藏过滤
+  if (showFavoritesOnly.value) {
+    filteredPrompts = filteredPrompts.filter(prompt => prompt.isFavorited)
+  }
   
   // 搜索过滤
   if (searchQuery.value.trim()) {
@@ -124,6 +143,9 @@ const displayPrompts = computed(() => {
 })
 
 const totalCount = computed(() => {
+  if (showFavoritesOnly.value) {
+    return promptsData.value?.data?.filter(prompt => prompt.isFavorited).length || 0
+  }
   return promptsData.value?.data?.length || 0
 })
 
@@ -134,6 +156,32 @@ const handleSearch = () => {
 
 const toggleSortOrder = () => {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+}
+
+const toggleFavoritesFilter = () => {
+  showFavoritesOnly.value = !showFavoritesOnly.value
+}
+
+const handleToggleFavorite = async (prompt: Prompt) => {
+  try {
+    const response = await $fetch<{success: boolean, data: Prompt, message: string}>(`/api/prompts/${prompt.id}/favorite`, {
+      method: 'POST'
+    })
+    
+    if (response.success) {
+      message.success(response.message)
+      // 更新本地数据
+      if (promptsData.value?.data) {
+        const index = promptsData.value.data.findIndex(p => p.id === prompt.id)
+        if (index !== -1) {
+          promptsData.value.data[index].isFavorited = response.data.isFavorited
+        }
+      }
+    }
+  } catch (error) {
+    message.error('操作失败，请重试')
+    console.error('切换收藏状态失败:', error)
+  }
 }
 
 const handleEdit = (prompt: Prompt) => {
