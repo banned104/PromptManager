@@ -57,52 +57,11 @@
 
           <!-- 图片上传 -->
           <n-form-item label="图片">
-            <div class="w-full">
-              <!-- 当前图片预览 -->
-              <div v-if="formData.imagePath && !newImagePreview" class="mb-4">
-                <img 
-                  :src="formData.imagePath" 
-                  alt="当前图片"
-                  class="max-w-xs h-auto rounded-lg shadow-md"
-                />
-                <div class="mt-2">
-                  <n-button size="small" @click="removeCurrentImage">
-                    移除图片
-                  </n-button>
-                </div>
-              </div>
-              
-              <!-- 新图片预览 -->
-              <div v-if="newImagePreview" class="mb-4">
-                <img 
-                  :src="newImagePreview" 
-                  alt="新图片预览"
-                  class="max-w-xs h-auto rounded-lg shadow-md"
-                />
-                <div class="mt-2">
-                  <n-button size="small" @click="removeNewImage">
-                    移除新图片
-                  </n-button>
-                </div>
-              </div>
-              
-              <!-- 上传组件 -->
-              <n-upload
-                :file-list="fileList"
-                :max="1"
-                list-type="image-card"
-                accept="image/*"
-                @change="handleFileChange"
-                @remove="handleFileRemove"
-                v-if="!formData.imagePath || newImagePreview"
-              >
-                {{ formData.imagePath ? '更换图片' : '点击上传图片' }}
-              </n-upload>
-              
-              <n-button v-else @click="showUpload = true">
-                更换图片
-              </n-button>
-            </div>
+            <SmartImageUpload
+              :initial-image="formData.imagePath"
+              @upload-success="handleUploadSuccess"
+              @upload-error="handleUploadError"
+            />
           </n-form-item>
 
           <!-- 标签 -->
@@ -142,8 +101,6 @@ import {
   NForm,
   NFormItem,
   NInput,
-  NUpload,
-  NDynamicTags,
   NButton,
   NSpace,
   NBreadcrumb,
@@ -151,9 +108,10 @@ import {
   NSpin,
   NResult,
   useMessage,
-  type FormInst,
-  type UploadFileInfo
+  type FormInst
 } from 'naive-ui'
+import SmartImageUpload from '@/components/SmartImageUpload.vue'
+import SmartTagInput from '@/components/SmartTagInput.vue'
 
 // 获取路由参数
 const route = useRoute()
@@ -163,9 +121,6 @@ const promptId = route.params.id as string
 // 响应式数据
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
-const fileList = ref<UploadFileInfo[]>([])
-const newImagePreview = ref('')
-const showUpload = ref(false)
 
 // 获取数据
 const { data: promptData, pending, error } = await useFetch(`/api/prompts/${promptId}`)
@@ -209,58 +164,14 @@ watch(promptData, (newData) => {
   }
 }, { immediate: true })
 
-// 方法
-const handleFileChange = async (options: { fileList: UploadFileInfo[] }) => {
-  fileList.value = options.fileList
-  if (options.fileList.length > 0) {
-    const file = options.fileList[0]
-    if (file?.file) {
-      try {
-        // 创建预览
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          newImagePreview.value = e.target?.result as string
-        }
-        reader.readAsDataURL(file.file)
-        
-        // 上传到服务器
-        const formDataUpload = new FormData()
-        formDataUpload.append('image', file.file)
-        
-        const response = await $fetch('/api/upload/image', {
-          method: 'POST',
-          body: formDataUpload
-        })
-        
-        if (response.success) {
-          formData.imagePath = response.data.url
-          message.success('图片上传成功')
-        }
-      } catch (error: any) {
-        console.error('图片上传失败:', error)
-        message.error('图片上传失败')
-        // 清除文件列表和预览
-        fileList.value = []
-        newImagePreview.value = ''
-      }
-    }
-  }
+// 智能上传处理
+const handleUploadSuccess = (url: string, file: File) => {
+  formData.imagePath = url
+  console.log('图片上传成功:', { url, fileName: file.name })
 }
 
-const handleFileRemove = () => {
-  newImagePreview.value = ''
-  formData.imagePath = (promptData.value?.data && typeof promptData.value.data === 'object' && !Array.isArray(promptData.value.data)) ? (promptData.value.data as {imagePath: string | null}).imagePath || '' : ''
-}
-
-const removeCurrentImage = () => {
-  formData.imagePath = ''
-  showUpload.value = true
-}
-
-const removeNewImage = () => {
-  newImagePreview.value = ''
-  fileList.value = []
-  formData.imagePath = (promptData.value?.data && typeof promptData.value.data === 'object' && !Array.isArray(promptData.value.data)) ? (promptData.value.data as {imagePath: string | null}).imagePath || '' : ''
+const handleUploadError = (error: string) => {
+  console.error('图片上传失败:', error)
 }
 
 const handleSubmit = async () => {

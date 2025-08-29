@@ -38,23 +38,13 @@
           />
         </n-form-item>
 
-        <!-- 图片上传 -->
-        <n-form-item label="图片">
-          <div class="w-full">
-            <n-upload
-              :file-list="fileList"
-              :max="1"
-              list-type="image-card"
-              accept="image/*"
-              @change="handleFileChange"
-              @remove="handleFileRemove"
-            >
-              点击上传图片
-            </n-upload>
-            <n-button class="mt-2" :loading="clipLoading" @click="handleClipboardUpload">
-              粘贴图片
-            </n-button>
-          </div>
+        <!-- 智能图片上传 -->
+        <n-form-item label="图片" path="imagePath">
+          <SmartImageUpload
+            v-model="formData.imagePath"
+            @upload-success="handleUploadSuccess"
+            @upload-error="handleUploadError"
+          />
         </n-form-item>
 
         <!-- 标签 -->
@@ -87,71 +77,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive } from 'vue'
 import {
   NCard,
   NForm,
   NFormItem,
   NInput,
-  NUpload,
   NButton,
   NSpace,
   NBreadcrumb,
   NBreadcrumbItem,
   useMessage,
-  type FormInst,
-  type UploadFileInfo
+  type FormInst
 } from 'naive-ui'
 
-import { useClipboardImage } from '@/composables/useClipboardImage'
+import SmartImageUpload from '@/components/SmartImageUpload.vue'
+import SmartTagInput from '@/components/SmartTagInput.vue'
 
 // 响应式数据
 const formRef = ref<FormInst | null>(null)
 const message = useMessage()
 const submitting = ref(false)
-const fileList = ref<UploadFileInfo[]>([])
-const imagePreview = ref<string>('')
 
-// 剪贴板图片相关
-const { imageFile: clipFile, imageDataUrl: clipPreview, readClipboard, loading: clipLoading } = useClipboardImage()
 
-// 监听剪贴板文件变化并自动上传
-watch(clipFile, async (file) => {
-  if (!file) return
-  try {
-    const formDataUpload = new FormData()
-    formDataUpload.append('image', file)
-    const response = await $fetch('/api/upload/image', {
-      method: 'POST',
-      body: formDataUpload
-    })
-    if (response.success) {
-        formData.imagePath = response.data.url
-        imagePreview.value = clipPreview.value
-        // 在上传列表中展示剪贴板图片，支持后续删除
-        fileList.value = [
-          {
-            id: Date.now().toString(),
-            name: file.name ?? 'clipboard-image',
-            status: 'finished',
-            url: clipPreview.value
-          } as unknown as UploadFileInfo
-        ]
-        message.success('图片上传成功')
-      }
-  } catch (error: any) {
-    console.error('剪贴板图片上传失败:', error)
-    message.error('剪贴板图片上传失败')
-  }
-})
-
-const handleClipboardUpload = async () => {
-  try {
-    await readClipboard()
-  } catch (e: any) {
-    message.error(e.message || '读取剪贴板失败')
-  }
-}
 // 表单数据
 const formData = reactive({
   title: '',
@@ -174,48 +122,14 @@ const rules = {
   }
 }
 
-// 方法
-const handleFileChange = async (options: { fileList: UploadFileInfo[] }) => {
-  fileList.value = options.fileList
-  if (options.fileList.length > 0) {
-    const file = options.fileList[0]
-    if (file?.file) {
-      try {
-        // 创建预览
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          imagePreview.value = e.target?.result as string
-        }
-        reader.readAsDataURL(file.file)
-        
-        // 上传到服务器
-        const formDataUpload = new FormData()
-        formDataUpload.append('image', file.file)
-        
-        const response = await $fetch('/api/upload/image', {
-          method: 'POST',
-          body: formDataUpload
-        })
-        
-        if (response.success) {
-          formData.imagePath = response.data.url
-          message.success('图片上传成功')
-        }
-      } catch (error: any) {
-        console.error('图片上传失败:', error)
-        message.error('图片上传失败')
-        // 清除文件列表
-        fileList.value = []
-        imagePreview.value = ''
-      }
-    }
-  }
+// 智能上传处理
+const handleUploadSuccess = (url: string, file: File) => {
+  formData.imagePath = url
+  console.log('图片上传成功:', { url, fileName: file.name })
 }
 
-const handleFileRemove = () => {
-  formData.imagePath = ''
-  imagePreview.value = ''
-  fileList.value = []
+const handleUploadError = (error: string) => {
+  console.error('图片上传失败:', error)
 }
 
 const handleSubmit = async () => {
