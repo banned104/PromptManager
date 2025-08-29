@@ -44,8 +44,21 @@ export default defineNuxtConfig({
     }
   },
   
-  // SSR 配置
-  ssr: true,
+  // SSR 配置 - 为Tauri集成禁用SSR
+  ssr: false,
+  
+  // 静态生成配置
+  nitro: {
+    preset: 'static'
+  },
+  
+  // 路由规则 - 预渲染所有路由
+  routeRules: {
+    '/': { prerender: true },
+    '/create': { prerender: true },
+    '/edit/**': { prerender: true },
+    '/prompt/**': { prerender: true }
+  },
   
   // 运行时配置
   runtimeConfig: {
