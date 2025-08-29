@@ -1,0 +1,33 @@
+{
+  "name": "nuxt-app",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "prisma generate && nuxt build",
+    "dev": "prisma generate && nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare && prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "@types/multer": "^2.0.0",
+    "@vicons/ionicons5": "^0.13.0",
+    "formidable": "^3.5.4",
+    "fuse.js": "^7.1.0",
+    "multer": "^2.0.2",
+    "naive-ui": "^2.42.0",
+    "nuxt": "^4.0.3",
+    "prisma": "^6.15.0",
+    "sqlite3": "^5.1.7",
+    "vue": "^3.5.20",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@nuxt/typescript-build": "^3.0.2",
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "@types/formidable": "^3.4.5",
+    "typescript": "^5.9.2",
+    "vite-tsconfig-paths": "^5.1.4"
+  }
+}
