@@ -148,21 +148,27 @@
         </div>
         
         <n-radio-group v-model:value="selectedFormat" name="format">
-          <n-space vertical>
-            <n-radio value="json">
-              <div class="flex flex-col">
-                <span class="font-medium">JSON 格式</span>
-                <span class="text-sm text-gray-500">结构化数据，便于程序处理和再次导入</span>
-              </div>
-            </n-radio>
-            <n-radio value="markdown">
-              <div class="flex flex-col">
-                <span class="font-medium">Markdown 格式</span>
-                <span class="text-sm text-gray-500">文档格式，便于阅读和分享</span>
-              </div>
-            </n-radio>
-          </n-space>
-        </n-radio-group>
+           <n-space vertical>
+             <n-radio value="json">
+               <div class="flex flex-col">
+                 <span class="font-medium">JSON 格式</span>
+                 <span class="text-sm text-gray-500">结构化数据，便于程序处理和再次导入</span>
+               </div>
+             </n-radio>
+             <n-radio value="markdown">
+               <div class="flex flex-col">
+                 <span class="font-medium">Markdown 格式</span>
+                 <span class="text-sm text-gray-500">文档格式，便于阅读和分享（仅文本）</span>
+               </div>
+             </n-radio>
+             <n-radio value="markdown-zip">
+               <div class="flex flex-col">
+                 <span class="font-medium">Markdown ZIP 格式</span>
+                 <span class="text-sm text-gray-500">包含Markdown文档和相关图片的压缩包</span>
+               </div>
+             </n-radio>
+           </n-space>
+         </n-radio-group>
       </n-space>
     </n-modal>
   </div>
@@ -193,7 +199,7 @@ const showBackToTop = ref(false) // 是否显示返回顶部按钮
 const importLoading = ref(false) // 导入加载状态
 const exportLoading = ref(false) // 导出加载状态
 const showFormatModal = ref(false) // 显示格式选择对话框
-const selectedFormat = ref<'json' | 'markdown'>('json') // 选中的格式
+const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选中的格式
 const message = useMessage()
 
 // 格式选择对话框的Promise resolver
@@ -315,7 +321,7 @@ const handleImport = () => {
   // 创建文件输入元素
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = '.json,.md,.markdown'
+  input.accept = '.json,.md,.markdown,.zip'
   input.style.display = 'none'
   
   input.onchange = async (event) => {
@@ -323,12 +329,12 @@ const handleImport = () => {
     if (!file) return
     
     // 验证文件类型
-    const allowedExtensions = ['.json', '.md', '.markdown']
+    const allowedExtensions = ['.json', '.md', '.markdown', '.zip']
     const fileName = file.name.toLowerCase()
     const isValidFile = allowedExtensions.some(ext => fileName.endsWith(ext))
     
     if (!isValidFile) {
-      message.error('请选择 JSON 或 Markdown 格式的文件')
+      message.error('请选择 JSON、Markdown 或 ZIP 格式的文件')
       return
     }
     
@@ -402,9 +408,10 @@ const handleExport = async () => {
   
   try {
     const params = new URLSearchParams({
-      format,
+      format: format === 'markdown-zip' ? 'markdown' : format,
       includeImages: 'true',
-      pretty: 'true'
+      pretty: 'true',
+      zipFormat: format === 'markdown-zip' ? 'true' : 'false'
     })
     
     const response = await fetch(`/api/export?${params.toString()}`)
@@ -415,7 +422,7 @@ const handleExport = async () => {
     
     // 获取文件名
     const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `prompts-export-${new Date().toISOString().split('T')[0]}.${format}`
+    let filename = `prompts-export-${new Date().toISOString().split('T')[0]}.${format === 'markdown-zip' ? 'zip' : format === 'markdown' ? 'md' : format}`
     
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="(.+)"/)

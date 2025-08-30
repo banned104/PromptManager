@@ -9,7 +9,7 @@ export const EXPORT_FORMAT_VERSION = '1.0.0'
 /**
  * 支持的文件格式
  */
-export type SupportedFormat = 'json' | 'markdown'
+export type SupportedFormat = 'json' | 'markdown' | 'markdown-zip'
 
 /**
  * 基础Prompt数据结构

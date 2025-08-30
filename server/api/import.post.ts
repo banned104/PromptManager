@@ -10,6 +10,10 @@ import type {
   FileProcessResult
 } from '~/types/import-export'
 import { VALIDATION_RULES, ImportErrorCode, EXPORT_FORMAT_VERSION } from '~/types/import-export'
+import JSZip from 'jszip'
+import { writeFile, mkdir } from 'fs/promises'
+import { join, extname, basename } from 'path'
+import { existsSync } from 'fs'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -18,9 +22,9 @@ export default defineEventHandler(async (event) => {
       maxFileSize: 10 * 1024 * 1024, // 10MB
       allowEmptyFiles: false,
       filter: ({ mimetype, originalFilename }) => {
-        // 只允许JSON和Markdown文件
-        const allowedTypes = ['application/json', 'text/markdown', 'text/plain']
-        const allowedExtensions = ['.json', '.md', '.markdown']
+        // 允许JSON、Markdown和ZIP文件
+        const allowedTypes = ['application/json', 'text/markdown', 'text/plain', 'application/zip']
+        const allowedExtensions = ['.json', '.md', '.markdown', '.zip']
         
         const hasValidMimeType = allowedTypes.includes(mimetype || '')
         const hasValidExtension = allowedExtensions.some(ext => 
@@ -49,15 +53,70 @@ export default defineEventHandler(async (event) => {
       format = 'json'
     } else if (filename.toLowerCase().endsWith('.md') || filename.toLowerCase().endsWith('.markdown')) {
       format = 'markdown'
+    } else if (filename.toLowerCase().endsWith('.zip')) {
+      format = 'markdown' // ZIP文件包含Markdown内容
     } else {
       throw createError({
         statusCode: 400,
-        statusMessage: '不支持的文件格式，请选择 .json 或 .md 文件'
+        statusMessage: '不支持的文件格式，请选择 .json、.md 或 .zip 文件'
       })
     }
 
     // 读取文件内容
-    const fileContent = await readFile(uploadedFile.filepath, 'utf-8')
+    let fileContent: string
+    let extractedImages: string[] = []
+    
+    if (filename.toLowerCase().endsWith('.zip')) {
+      // 处理ZIP文件
+      const zipBuffer = await readFile(uploadedFile.filepath)
+      const zip = new JSZip()
+      const zipContent = await zip.loadAsync(zipBuffer)
+      
+      // 查找Markdown文件
+      let markdownFile: JSZip.JSZipObject | null = null
+      zipContent.forEach((relativePath, file) => {
+        if (relativePath.endsWith('.md') || relativePath.endsWith('.markdown')) {
+          markdownFile = file
+        }
+      })
+      
+      if (!markdownFile) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'ZIP文件中未找到Markdown文件'
+        })
+      }
+      
+      fileContent = await markdownFile.async('text')
+      
+      // 提取图片文件
+      const uploadDir = join(process.cwd(), 'public', 'uploads')
+      if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true })
+      }
+      
+      const imagePromises: Promise<string>[] = []
+      zipContent.forEach((relativePath, file) => {
+        if (relativePath.startsWith('images/') && !file.dir) {
+          const imageExtension = extname(relativePath).toLowerCase()
+          if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(imageExtension)) {
+            imagePromises.push(
+              file.async('nodebuffer').then(async (buffer) => {
+                const timestamp = Date.now()
+                const imageName = `${timestamp}_${basename(relativePath)}`
+                const imagePath = join(uploadDir, imageName)
+                await writeFile(imagePath, buffer)
+                return `/uploads/${imageName}`
+              })
+            )
+          }
+        }
+      })
+      
+      extractedImages = await Promise.all(imagePromises)
+    } else {
+      fileContent = await readFile(uploadedFile.filepath, 'utf-8')
+    }
     
     // 解析导入选项
     const options: ImportOptions = {
@@ -68,7 +127,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // 解析和验证数据
-    const validationResult = await parseAndValidateData(fileContent, format)
+    const validationResult = await parseAndValidateData(fileContent, format, extractedImages)
     
     if (!validationResult.isValid) {
       return {
@@ -111,7 +170,7 @@ export default defineEventHandler(async (event) => {
 /**
  * 解析和验证数据
  */
-async function parseAndValidateData(content: string, format: SupportedFormat): Promise<ImportValidationResult> {
+async function parseAndValidateData(content: string, format: SupportedFormat, extractedImages: string[] = []): Promise<ImportValidationResult> {
   const result: ImportValidationResult = {
     isValid: false,
     errors: [],
@@ -152,6 +211,17 @@ async function parseAndValidateData(content: string, format: SupportedFormat): P
     } else {
       // 解析Markdown格式
       prompts = parseMarkdownContent(content)
+      
+      // 如果有提取的图片，更新图片路径
+      if (extractedImages.length > 0) {
+        let imageIndex = 0
+        prompts.forEach(prompt => {
+          if (prompt.imagePath && imageIndex < extractedImages.length) {
+            prompt.imagePath = extractedImages[imageIndex]
+            imageIndex++
+          }
+        })
+      }
     }
 
     result.summary.total = prompts.length

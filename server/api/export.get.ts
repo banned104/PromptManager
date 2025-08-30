@@ -1,12 +1,16 @@
 import { prisma } from '~/app/lib/prisma'
 import type { ExportData, BasePromptData, SupportedFormat, MarkdownExportOptions, JsonExportOptions } from '~/types/import-export'
 import { EXPORT_FORMAT_VERSION } from '~/types/import-export'
+import JSZip from 'jszip'
+import { readFile } from 'fs/promises'
+import { join, basename, extname } from 'path'
 
 export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event)
     const format = (query.format as SupportedFormat) || 'json'
     const includeImages = query.includeImages === 'true'
+    const zipFormat = query.zipFormat === 'true'
     const pretty = query.pretty !== 'false' // 默认格式化
     
     // 验证格式
@@ -42,6 +46,8 @@ export default defineEventHandler(async (event) => {
       updatedAt: prompt.updatedAt.toISOString()
     }))
 
+    const timestamp = new Date().toISOString().split('T')[0]
+    
     if (format === 'json') {
       // JSON格式导出
       const exportData: ExportData = {
@@ -63,11 +69,11 @@ export default defineEventHandler(async (event) => {
       
       // 设置响应头
       setHeader(event, 'Content-Type', 'application/json')
-      setHeader(event, 'Content-Disposition', `attachment; filename="prompts-export-${new Date().toISOString().split('T')[0]}.json"`)
+      setHeader(event, 'Content-Disposition', `attachment; filename="prompts-export-${timestamp}.json"`)
       
       return jsonContent
-    } else {
-      // Markdown格式导出
+    } else if (format === 'markdown' && !zipFormat) {
+      // Markdown格式导出（不压缩）
       const markdownContent = generateMarkdown(exportPrompts, {
         includeMetadata: true,
         includeImages,
@@ -77,9 +83,46 @@ export default defineEventHandler(async (event) => {
       
       // 设置响应头
       setHeader(event, 'Content-Type', 'text/markdown')
-      setHeader(event, 'Content-Disposition', `attachment; filename="prompts-export-${new Date().toISOString().split('T')[0]}.md"`)
+      setHeader(event, 'Content-Disposition', `attachment; filename="prompts-export-${timestamp}.md"`)
       
       return markdownContent
+    } else {
+      // Markdown ZIP格式导出（包含图片）
+      const zip = new JSZip()
+      const markdownContent = generateMarkdown(exportPrompts, {
+        includeMetadata: true,
+        includeImages,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      })
+      
+      // 添加Markdown文件到ZIP
+      zip.file(`prompts-export-${timestamp}.md`, markdownContent)
+      
+      // 添加图片到ZIP
+      if (includeImages) {
+        const imageFolder = zip.folder('images')
+        
+        for (const prompt of exportPrompts) {
+          if (prompt.imagePath) {
+            try {
+              const imagePath = join(process.cwd(), 'public', prompt.imagePath)
+              const imageBuffer = await readFile(imagePath)
+              const imageName = basename(prompt.imagePath)
+              imageFolder?.file(imageName, imageBuffer)
+            } catch (error) {
+              console.warn(`Failed to read image: ${prompt.imagePath}`, error)
+            }
+          }
+        }
+      }
+      
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
+      
+      setHeader(event, 'Content-Type', 'application/zip')
+      setHeader(event, 'Content-Disposition', `attachment; filename="prompts-export-${timestamp}.zip"`)
+      
+      return zipBuffer
     }
   } catch (error: any) {
     console.error('导出失败:', error)
