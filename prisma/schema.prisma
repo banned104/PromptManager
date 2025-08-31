@@ -16,6 +16,7 @@ model Prompt {
   content     String
   imagePath   String?  @map("image_path")
   tags        String?  // JSON格式存储标签
+  highlights  String?  // JSON格式存储高亮文本信息
   isFavorited Boolean  @default(false) @map("is_favorited")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")

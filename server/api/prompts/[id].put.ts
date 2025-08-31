@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
     if (body.content !== undefined) updateData.content = body.content
     if (body.imagePath !== undefined) updateData.imagePath = body.imagePath
     if (body.tags !== undefined) updateData.tags = body.tags ? JSON.stringify(body.tags) : null
+    if (body.highlights !== undefined) updateData.highlights = body.highlights ? JSON.stringify(body.highlights) : null
     
     const updatedPrompt = await prisma.prompt.update({
       where: { id: Number(id) },

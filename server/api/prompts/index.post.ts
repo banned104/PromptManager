@@ -17,7 +17,8 @@ export default defineEventHandler(async (event) => {
         title: body.title,
         content: body.content,
         imagePath: body.imagePath || null,
-        tags: body.tags ? JSON.stringify(body.tags) : null
+        tags: body.tags ? JSON.stringify(body.tags) : null,
+        highlights: body.highlights ? JSON.stringify(body.highlights) : null
       }
     })
     

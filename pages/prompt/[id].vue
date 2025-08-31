@@ -69,7 +69,12 @@
         <div class="mb-6">
           <h3 class="text-lg font-semibold text-gray-700 mb-3">内容</h3>
           <div class="bg-gray-50 p-4 rounded-lg">
-            <pre class="whitespace-pre-wrap text-gray-800 font-mono text-sm">{{ (promptData.data as {content: string}).content }}</pre>
+            <HighlightableText 
+              :text="(promptData.data as {content: string}).content" 
+              :highlights="parsedHighlights"
+              :editable="false"
+              class="whitespace-pre-wrap text-gray-800 font-mono text-sm"
+            />
           </div>
         </div>
 
@@ -121,6 +126,15 @@ import {
   useMessage
 } from 'naive-ui'
 import { Create as EditIcon, Trash as DeleteIcon } from '@vicons/ionicons5'
+import HighlightableText from '~/components/HighlightableText.vue'
+
+interface Highlight {
+  id: string
+  start: number
+  end: number
+  text: string
+  color: string
+}
 
 // 获取路由参数
 const route = useRoute()
@@ -137,6 +151,18 @@ const parsedTags = computed(() => {
   if (!data.tags) return []
   try {
     return JSON.parse(data.tags as string)
+  } catch {
+    return []
+  }
+})
+
+// 解析高亮数据
+const parsedHighlights = computed(() => {
+  if (!promptData.value?.data || typeof promptData.value.data === 'object' && Array.isArray(promptData.value.data)) return []
+  const data = promptData.value.data as {highlights: string | null}
+  if (!data.highlights) return []
+  try {
+    return JSON.parse(data.highlights as string) as Highlight[]
   } catch {
     return []
   }

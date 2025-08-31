@@ -45,14 +45,29 @@
 
           <!-- 内容 -->
           <n-form-item label="内容" path="content">
-            <n-input
-              v-model:value="formData.content"
-              type="textarea"
-              placeholder="请输入 Prompt 内容"
-              :rows="8"
-              maxlength="5000"
-              show-count
-            />
+            <div class="space-y-4">
+              <!-- 文本输入区域 -->
+              <n-input
+                v-model:value="formData.content"
+                type="textarea"
+                placeholder="请输入 Prompt 内容"
+                :rows="6"
+                maxlength="5000"
+                show-count
+              />
+              
+              <!-- 高亮文本预览 -->
+              <div class="border rounded-lg p-4 bg-gray-50">
+                <div class="text-sm text-gray-600 mb-2">高亮预览：</div>
+                <HighlightableText 
+                  :text="formData.content" 
+                  :highlights="formData.highlights"
+                  :editable="true"
+                  @update:highlights="handleHighlightsUpdate"
+                  class="text-sm text-gray-700 font-mono leading-relaxed min-h-[100px]"
+                />
+              </div>
+            </div>
           </n-form-item>
 
           <!-- 图片上传 -->
@@ -112,7 +127,16 @@ import {
 } from 'naive-ui'
 import SmartImageUpload from '@/components/SmartImageUpload.vue'
 import SmartTagInput from '@/components/SmartTagInput.vue'
+import HighlightableText from '~/components/HighlightableText.vue'
 import { useCache } from '~/composables/useCache'
+
+interface Highlight {
+  id: string
+  start: number
+  end: number
+  text: string
+  color: string
+}
 
 // 获取路由参数
 const route = useRoute()
@@ -132,7 +156,8 @@ const formData = reactive({
   title: '',
   content: '',
   imagePath: '',
-  tags: [] as string[]
+  tags: [] as string[],
+  highlights: [] as Highlight[]
 })
 
 // 表单验证规则
@@ -152,7 +177,7 @@ const rules = {
 // 监听数据变化，初始化表单
 watch(promptData, (newData) => {
   if (newData?.data && typeof newData.data === 'object' && !Array.isArray(newData.data)) {
-    const data = newData.data as { title: string; content: string; imagePath: string | null; tags: string | null }
+    const data = newData.data as { title: string; content: string; imagePath: string | null; tags: string | null; highlights: string | null }
     formData.title = data.title || ''
     formData.content = data.content || ''
     formData.imagePath = data.imagePath || ''
@@ -163,8 +188,20 @@ watch(promptData, (newData) => {
     } catch {
       formData.tags = []
     }
+    
+    // 解析高亮数据
+    try {
+      formData.highlights = data.highlights ? JSON.parse(data.highlights) : []
+    } catch {
+      formData.highlights = []
+    }
   }
 }, { immediate: true })
+
+// 处理高亮更新
+const handleHighlightsUpdate = (highlights: Highlight[]) => {
+  formData.highlights = highlights
+}
 
 // 智能上传处理
 const handleUploadSuccess = (url: string, file: File) => {
@@ -189,7 +226,8 @@ const handleSubmit = async () => {
         title: formData.title,
         content: formData.content,
         imagePath: formData.imagePath || null,
-        tags: formData.tags.length > 0 ? formData.tags : null
+        tags: formData.tags.length > 0 ? formData.tags : null,
+        highlights: formData.highlights.length > 0 ? formData.highlights : null
       }
     })
     
