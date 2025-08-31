@@ -93,11 +93,13 @@ import {
 
 import SmartImageUpload from '@/components/SmartImageUpload.vue'
 import SmartTagInput from '@/components/SmartTagInput.vue'
+import { useCache } from '~/composables/useCache'
 
 // 响应式数据
 const formRef = ref<FormInst | null>(null)
 const message = useMessage()
 const submitting = ref(false)
+const { invalidateCache } = useCache()
 
 
 // 表单数据
@@ -151,7 +153,12 @@ const handleSubmit = async () => {
     
     if (response.success) {
       message.success('创建成功！')
-      navigateTo('/')
+      // 清除相关缓存
+      invalidateCache('prompts')
+      // 等待一小段时间确保数据库操作完成
+      await new Promise(resolve => setTimeout(resolve, 100))
+      // 跳转到首页并添加刷新参数
+      await navigateTo('/?refresh=true')
     }
   } catch (error: any) {
     console.error('创建失败:', error)

@@ -3,7 +3,11 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import { fileURLToPath } from 'node:url'
 
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  // 禁用开发工具以减少内存占用
+  devtools: { enabled: false },
+  
+  // 禁用SSR，使用SPA模式
+  ssr: false,
   
   // 源代码目录配置
   srcDir: '.',
@@ -20,7 +24,8 @@ export default defineNuxtConfig({
   
   // 模块配置
   modules: [
-    '@nuxtjs/tailwindcss'
+    '@nuxtjs/tailwindcss',
+    '@nuxt/image'
   ],
   
   // 构建配置
@@ -28,7 +33,6 @@ export default defineNuxtConfig({
     transpile: [
       'naive-ui',
       'vueuc',
-      '@css-render/vue3-ssr',
       '@juggle/resize-observer'
     ]
   },
@@ -41,11 +45,31 @@ export default defineNuxtConfig({
         'naive-ui',
         '@vicons/ionicons5'
       ]
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'naive-ui': ['naive-ui'],
+            'icons': ['@vicons/ionicons5']
+          }
+        }
+      }
     }
   },
   
-  // SSR 配置
-  ssr: true,
+  // 图片优化配置
+  image: {
+    quality: 80,
+    format: ['webp', 'jpg'],
+    screens: {
+      xs: 320,
+      sm: 640,
+      md: 768,
+      lg: 1024,
+      xl: 1280
+    }
+  },
   
   // 运行时配置
   runtimeConfig: {
@@ -71,6 +95,12 @@ export default defineNuxtConfig({
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }
       ]
     }
+  },
+  
+  // 性能优化
+  experimental: {
+    payloadExtraction: false,
+    renderJsonPayloads: false
   },
   
   // 开发服务器配置

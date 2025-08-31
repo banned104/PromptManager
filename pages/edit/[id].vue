@@ -112,6 +112,7 @@ import {
 } from 'naive-ui'
 import SmartImageUpload from '@/components/SmartImageUpload.vue'
 import SmartTagInput from '@/components/SmartTagInput.vue'
+import { useCache } from '~/composables/useCache'
 
 // 获取路由参数
 const route = useRoute()
@@ -121,6 +122,7 @@ const promptId = route.params.id as string
 // 响应式数据
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
+const { invalidateCache } = useCache()
 
 // 获取数据
 const { data: promptData, pending, error } = await useFetch(`/api/prompts/${promptId}`)
@@ -193,7 +195,10 @@ const handleSubmit = async () => {
     
     if (response.success) {
       message.success('更新成功！')
-      navigateTo(`/prompt/${promptId}`)
+      // 清除相关缓存
+      invalidateCache('prompts')
+      invalidateCache(`/api/prompts/${promptId}`)
+      await navigateTo(`/prompt/${promptId}`)
     }
   } catch (error: any) {
     console.error('更新失败:', error)

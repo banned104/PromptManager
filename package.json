@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare && prisma generate"
   },
   "dependencies": {
+    "@nuxt/image": "^1.11.0",
     "@prisma/client": "^6.15.0",
     "@types/multer": "^2.0.0",
     "@vicons/ionicons5": "^0.13.0",

@@ -85,7 +85,7 @@
     </div>
 
     <!-- 加载状态 -->
-    <div v-if="pending" class="flex justify-center py-8">
+    <div v-if="loading && allPrompts.length === 0" class="flex justify-center py-8">
       <n-spin size="large" />
     </div>
 
@@ -101,8 +101,26 @@
       />
     </div>
 
+    <!-- 加载更多按钮 -->
+    <div v-if="displayPrompts.length > 0 && hasMore" class="flex justify-center mt-8">
+      <n-button 
+        @click="loadMore" 
+        :loading="loading"
+        size="large"
+        type="primary"
+        ghost
+      >
+        {{ loading ? '加载中...' : '加载更多' }}
+      </n-button>
+    </div>
+
+    <!-- 底部加载状态 -->
+    <div v-if="loading && allPrompts.length > 0" class="flex justify-center py-4">
+      <n-spin size="medium" />
+    </div>
+
     <!-- 空状态 -->
-    <div v-else class="text-center py-12">
+    <div v-else-if="displayPrompts.length === 0 && !loading" class="text-center py-12">
       <n-empty description="暂无 Prompts">
         <template #extra>
           <n-button type="primary" @click="navigateTo('/create')">
@@ -175,9 +193,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, useMessage } from 'naive-ui'
 import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon } from '@vicons/ionicons5'
+import { useCache } from '~/composables/useCache'
 
 // 类型定义
 interface Prompt {
@@ -201,63 +220,117 @@ const exportLoading = ref(false) // 导出加载状态
 const showFormatModal = ref(false) // 显示格式选择对话框
 const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选中的格式
 const message = useMessage()
+const { cachedFetch, invalidateCache } = useCache()
+
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(12)
+const allPrompts = ref<Prompt[]>([])
+const totalCount = ref(0)
+const loading = ref(false)
+const hasMore = ref(true)
 
 // 格式选择对话框的Promise resolver
 let formatDialogResolver: ((value: string | null) => void) | null = null
 
-// 获取数据
-const { data: promptsData, pending, refresh } = await useFetch<{success: boolean, data: Prompt[]}>('/api/prompts')
+// 防抖搜索
+const debouncedSearch = ref('')
+let searchTimeout: NodeJS.Timeout | null = null
 
 // 计算属性
-const displayPrompts = computed(() => {
-  if (!promptsData.value?.data) return []
-  
-  let filteredPrompts = promptsData.value.data
-  
-  // 收藏过滤
-  if (showFavoritesOnly.value) {
-    filteredPrompts = filteredPrompts.filter(prompt => prompt.isFavorited)
-  }
-  
-  // 搜索过滤
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase()
-    filteredPrompts = filteredPrompts.filter(prompt => 
-      prompt.title.toLowerCase().includes(query) ||
-      prompt.content.toLowerCase().includes(query) ||
-      (prompt.tags && prompt.tags.toLowerCase().includes(query))
-    )
-  }
-  
-  // 时间排序
-  return [...filteredPrompts].sort((a, b) => {
-    const dateA = new Date(a.createdAt).getTime()
-    const dateB = new Date(b.createdAt).getTime()
-    return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB
-  })
-})
+const displayPrompts = computed(() => allPrompts.value)
 
-const totalCount = computed(() => {
-  if (showFavoritesOnly.value) {
-    return promptsData.value?.data?.filter(prompt => prompt.isFavorited).length || 0
+// 数据获取函数
+const fetchPrompts = async (page = 1, reset = false, force = false) => {
+  if (loading.value) return
+  
+  loading.value = true
+  
+  try {
+    const params = {
+      page: page.toString(),
+      limit: pageSize.value.toString(),
+      search: debouncedSearch.value,
+      favorites: showFavoritesOnly.value.toString(),
+      sort: sortOrder.value
+    }
+    
+    const response = await cachedFetch<{
+       success: boolean
+       data: Prompt[]
+       pagination: {
+         total: number
+         page: number
+         limit: number
+         totalPages: number
+         hasNext: boolean
+         hasPrev: boolean
+       }
+     }>('/api/prompts', { params, ttl: 5 * 60 * 1000, force })
+    
+    if (response.success) {
+      if (reset) {
+        allPrompts.value = response.data
+      } else {
+        allPrompts.value.push(...response.data)
+      }
+      
+      totalCount.value = response.pagination.total
+      hasMore.value = response.pagination.hasNext
+      currentPage.value = response.pagination.page
+    }
+  } catch (error) {
+    console.error('获取数据失败:', error)
+    message.error('获取数据失败，请重试')
+  } finally {
+    loading.value = false
   }
-  return promptsData.value?.data?.length || 0
-})
+}
+
+// 加载更多数据
+const loadMore = async () => {
+  if (hasMore.value && !loading.value) {
+    await fetchPrompts(currentPage.value + 1, false)
+  }
+}
+
+// 重置并重新加载数据
+const resetAndFetch = async (force = false) => {
+  currentPage.value = 1
+  hasMore.value = true
+  await fetchPrompts(1, true, force)
+}
 
 // 方法
 const handleSearch = () => {
-  // 搜索逻辑已在计算属性中处理
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  
+  searchTimeout = setTimeout(() => {
+    debouncedSearch.value = searchQuery.value
+    resetAndFetch()
+  }, 300)
 }
 
-const toggleSortOrder = () => {
+const toggleSortOrder = async () => {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  await resetAndFetch()
 }
 
-const toggleFavoritesFilter = () => {
+const toggleFavoritesFilter = async () => {
   showFavoritesOnly.value = !showFavoritesOnly.value
+  await resetAndFetch()
 }
 
 const handleToggleFavorite = async (prompt: Prompt) => {
+  // 乐观更新：立即更新本地状态
+  const index = allPrompts.value.findIndex(p => p.id === prompt.id)
+  if (index === -1) return
+  
+  const originalState = allPrompts.value[index].isFavorited
+  allPrompts.value[index].isFavorited = !originalState
+  
   try {
     const response = await $fetch<{success: boolean, data: Prompt, message: string}>(`/api/prompts/${prompt.id}/favorite`, {
       method: 'POST'
@@ -265,17 +338,33 @@ const handleToggleFavorite = async (prompt: Prompt) => {
     
     if (response.success) {
       message.success(response.message)
-      // 更新本地数据
-      if (promptsData.value?.data) {
-        const index = promptsData.value.data.findIndex(p => p.id === prompt.id)
-        if (index !== -1) {
-          promptsData.value.data[index].isFavorited = response.data.isFavorited
-        }
-      }
+      // 确保状态与服务器返回的一致
+      allPrompts.value[index].isFavorited = response.data.isFavorited
+      // 清除相关缓存
+      invalidateCache('prompts')
+    } else {
+      // 请求成功但操作失败，恢复原始状态
+      allPrompts.value[index].isFavorited = originalState
     }
   } catch (error) {
+    // 请求失败，恢复原始状态
+    allPrompts.value[index].isFavorited = originalState
     message.error('操作失败，请重试')
     console.error('切换收藏状态失败:', error)
+  }
+}
+
+// 无限滚动处理
+const handleScroll = () => {
+  showBackToTop.value = window.scrollY > 300
+  
+  // 检查是否需要加载更多
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+  const windowHeight = window.innerHeight
+  const documentHeight = document.documentElement.scrollHeight
+  
+  if (scrollTop + windowHeight >= documentHeight - 200) {
+    loadMore()
   }
 }
 
@@ -287,17 +376,35 @@ const scrollToTop = () => {
   })
 }
 
-const handleScroll = () => {
-  showBackToTop.value = window.scrollY > 300
-}
-
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('scroll', handleScroll)
+  
+  // 检查是否需要强制刷新
+  const route = useRoute()
+  const shouldRefresh = route.query.refresh === 'true'
+  
+  if (shouldRefresh) {
+    // 重置所有状态
+    currentPage.value = 1
+    hasMore.value = true
+    allPrompts.value = []
+    // 清除缓存并强制刷新数据
+    invalidateCache('prompts')
+    await fetchPrompts(1, true, true)
+    // 数据加载完成后再清除URL参数
+    await nextTick()
+    await navigateTo('/', { replace: true })
+  } else {
+    await fetchPrompts(1, true)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
 })
 
 const handleEdit = (prompt: Prompt) => {
@@ -305,13 +412,20 @@ const handleEdit = (prompt: Prompt) => {
 }
 
 const handleDelete = async (prompt: Prompt) => {
+  // 乐观更新：立即从本地状态中移除
+  const originalPrompts = [...allPrompts.value]
+  allPrompts.value = allPrompts.value.filter(p => p.id !== prompt.id)
+  
   try {
     await $fetch(`/api/prompts/${prompt.id}`, {
       method: 'DELETE'
     })
     message.success('删除成功')
-    refresh()
+    invalidateCache('prompts')
+    // 删除成功，不需要重新获取数据
   } catch (error) {
+    // 删除失败，恢复原始状态
+    allPrompts.value = originalPrompts
     message.error('删除失败')
   }
 }
@@ -369,7 +483,8 @@ const handleImport = () => {
             message.warning(warning)
           })
         }
-        // 刷新数据
+        // 清除缓存并刷新数据
+        invalidateCache('prompts')
         refresh()
       } else {
         message.error(response.message)
@@ -395,7 +510,7 @@ const handleImport = () => {
 }
 
 const handleExport = async () => {
-  if (!promptsData.value?.data || promptsData.value.data.length === 0) {
+  if (!allPrompts.value || allPrompts.value.length === 0) {
     message.warning('没有可导出的数据')
     return
   }
@@ -407,43 +522,70 @@ const handleExport = async () => {
   exportLoading.value = true
   
   try {
-    const params = new URLSearchParams({
-      format: format === 'markdown-zip' ? 'markdown' : format,
-      includeImages: 'true',
-      pretty: 'true',
-      zipFormat: format === 'markdown-zip' ? 'true' : 'false'
-    })
-    
-    const response = await fetch(`/api/export?${params.toString()}`)
-    
-    if (!response.ok) {
-      throw new Error('导出失败')
+    let content: string
+    let filename: string
+    let mimeType: string
+
+    switch (format) {
+      case 'json':
+        content = JSON.stringify(allPrompts.value, null, 2)
+        filename = `prompts-${new Date().toISOString().split('T')[0]}.json`
+        mimeType = 'application/json'
+        break
+      
+      case 'markdown':
+        content = allPrompts.value.map((prompt: Prompt) => {
+          let md = `# ${prompt.title}\n\n`
+          md += `**内容:** ${prompt.content}\n\n`
+          if (prompt.tags && prompt.tags.length > 0) {
+            md += `**标签:** ${prompt.tags.join(', ')}\n\n`
+          }
+          if (prompt.imagePath) {
+            md += `**图片:** ${prompt.imagePath}\n\n`
+          }
+          md += `**创建时间:** ${new Date(prompt.createdAt).toLocaleString()}\n\n`
+          md += '---\n\n'
+          return md
+        }).join('')
+        filename = `prompts-${new Date().toISOString().split('T')[0]}.md`
+        mimeType = 'text/markdown'
+        break
+      
+      case 'markdown-zip':
+        // 这里需要实现ZIP功能，暂时使用普通markdown
+        content = allPrompts.value.map((prompt: Prompt) => {
+          let md = `# ${prompt.title}\n\n`
+          md += `**内容:** ${prompt.content}\n\n`
+          if (prompt.tags && prompt.tags.length > 0) {
+            md += `**标签:** ${prompt.tags.join(', ')}\n\n`
+          }
+          if (prompt.imagePath) {
+            md += `**图片:** ${prompt.imagePath}\n\n`
+          }
+          md += `**创建时间:** ${new Date(prompt.createdAt).toLocaleString()}\n\n`
+          md += '---\n\n'
+          return md
+        }).join('')
+        filename = `prompts-${new Date().toISOString().split('T')[0]}.md`
+        mimeType = 'text/markdown'
+        break
+      
+      default:
+        throw new Error('不支持的导出格式')
     }
-    
-    // 获取文件名
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `prompts-export-${new Date().toISOString().split('T')[0]}.${format === 'markdown-zip' ? 'zip' : format === 'markdown' ? 'md' : format}`
-    
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="(.+)"/)
-      if (filenameMatch) {
-        filename = filenameMatch[1]
-      }
-    }
-    
-    // 下载文件
-    const blob = await response.blob()
+
+    // 创建并下载文件
+    const blob = new Blob([content], { type: mimeType })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = filename
-    a.style.display = 'none'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
     
-    message.success(`成功导出 ${promptsData.value.data.length} 个 Prompt`)
+    message.success(`成功导出 ${allPrompts.value.length} 个 Prompt`)
   } catch (error: any) {
     console.error('导出失败:', error)
     message.error('导出失败，请重试')
@@ -477,6 +619,12 @@ const cancelFormatSelection = () => {
     formatDialogResolver(null)
     formatDialogResolver = null
   }
+}
+
+// 刷新数据函数
+const refresh = async () => {
+  invalidateCache('prompts')
+  await resetAndFetch()
 }
 
 // 页面元数据

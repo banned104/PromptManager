@@ -25,10 +25,14 @@
     </div>
     <!-- 图片展示 -->
     <div v-if="prompt.imagePath" class="mb-4">
-      <img 
+      <NuxtImg 
         :src="prompt.imagePath" 
         :alt="prompt.title"
         class="w-full h-48 object-cover rounded-lg"
+        loading="lazy"
+        placeholder
+        quality="80"
+        format="webp"
         @error="handleImageError"
       />
     </div>
