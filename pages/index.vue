@@ -522,76 +522,85 @@ const handleExport = async () => {
   exportLoading.value = true
   
   try {
-    let content: string
-    let filename: string
-    let mimeType: string
+      const timestamp = new Date().toISOString().split('T')[0]
 
-    switch (format) {
-      case 'json':
-        content = JSON.stringify(allPrompts.value, null, 2)
-        filename = `prompts-${new Date().toISOString().split('T')[0]}.json`
-        mimeType = 'application/json'
-        break
+      if (format === 'markdown-zip') {
+        // 使用后端API导出ZIP格式
+        const url = `/api/export?format=markdown&zipFormat=true&includeImages=true`
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `prompts-${timestamp}.zip`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        message.success(`成功导出 ${allPrompts.value.length} 个 Prompt 的ZIP文件`)
+      } else {
+        // 处理其他格式
+        let content: string
+        let filename: string
+        let mimeType: string
+
+        switch (format) {
+          case 'json':
+            content = JSON.stringify(allPrompts.value, null, 2)
+            filename = `prompts-${timestamp}.json`
+            mimeType = 'application/json'
+            break
+          
+          case 'markdown':
+            content = allPrompts.value.map((prompt: Prompt) => {
+              let md = `# ${prompt.title}\n\n`
+              md += `**内容:** ${prompt.content}\n\n`
+              
+              // 解析标签（支持字符串和数组格式）
+              let tags: string[] = []
+              if (prompt.tags) {
+                try {
+                  // 尝试解析JSON格式的标签
+                  const parsedTags = JSON.parse(prompt.tags)
+                  tags = Array.isArray(parsedTags) ? parsedTags : [prompt.tags]
+                } catch {
+                  // 如果不是JSON，按字符串处理
+                  tags = typeof prompt.tags === 'string' ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : []
+                }
+              }
+              
+              if (tags.length > 0) {
+                md += `**标签:** ${tags.join(', ')}\n\n`
+              }
+              if (prompt.imagePath) {
+                md += `**图片:** ${prompt.imagePath}\n\n`
+              }
+              md += `**创建时间:** ${new Date(prompt.createdAt).toLocaleString()}\n\n`
+              md += '---\n\n'
+              return md
+            }).join('')
+            filename = `prompts-${timestamp}.md`
+            mimeType = 'text/markdown'
+            break
+          
+          default:
+            throw new Error('不支持的导出格式')
+        }
+
+        // 创建并下载文件
+        const blob = new Blob([content], { type: mimeType })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }
       
-      case 'markdown':
-        content = allPrompts.value.map((prompt: Prompt) => {
-          let md = `# ${prompt.title}\n\n`
-          md += `**内容:** ${prompt.content}\n\n`
-          if (prompt.tags && prompt.tags.length > 0) {
-            md += `**标签:** ${prompt.tags.join(', ')}\n\n`
-          }
-          if (prompt.imagePath) {
-            md += `**图片:** ${prompt.imagePath}\n\n`
-          }
-          md += `**创建时间:** ${new Date(prompt.createdAt).toLocaleString()}\n\n`
-          md += '---\n\n'
-          return md
-        }).join('')
-        filename = `prompts-${new Date().toISOString().split('T')[0]}.md`
-        mimeType = 'text/markdown'
-        break
-      
-      case 'markdown-zip':
-        // 这里需要实现ZIP功能，暂时使用普通markdown
-        content = allPrompts.value.map((prompt: Prompt) => {
-          let md = `# ${prompt.title}\n\n`
-          md += `**内容:** ${prompt.content}\n\n`
-          if (prompt.tags && prompt.tags.length > 0) {
-            md += `**标签:** ${prompt.tags.join(', ')}\n\n`
-          }
-          if (prompt.imagePath) {
-            md += `**图片:** ${prompt.imagePath}\n\n`
-          }
-          md += `**创建时间:** ${new Date(prompt.createdAt).toLocaleString()}\n\n`
-          md += '---\n\n'
-          return md
-        }).join('')
-        filename = `prompts-${new Date().toISOString().split('T')[0]}.md`
-        mimeType = 'text/markdown'
-        break
-      
-      default:
-        throw new Error('不支持的导出格式')
+    } catch (error: any) {
+      console.error('导出失败:', error)
+      message.error('导出失败，请重试')
+    } finally {
+      exportLoading.value = false
     }
-
-    // 创建并下载文件
-    const blob = new Blob([content], { type: mimeType })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
-    
-    message.success(`成功导出 ${allPrompts.value.length} 个 Prompt`)
-  } catch (error: any) {
-    console.error('导出失败:', error)
-    message.error('导出失败，请重试')
-  } finally {
-    exportLoading.value = false
-  }
 }
 
 // 显示格式选择对话框

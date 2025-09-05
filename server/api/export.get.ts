@@ -78,7 +78,8 @@ export default defineEventHandler(async (event) => {
         includeMetadata: true,
         includeImages,
         sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        zipFormat: false
       })
       
       // 设置响应头
@@ -93,7 +94,8 @@ export default defineEventHandler(async (event) => {
         includeMetadata: true,
         includeImages,
         sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        zipFormat: true
       })
       
       // 添加Markdown文件到ZIP
@@ -140,7 +142,7 @@ export default defineEventHandler(async (event) => {
  * 生成Markdown格式内容
  */
 function generateMarkdown(prompts: BasePromptData[], options: MarkdownExportOptions): string {
-  const { includeMetadata = true, includeImages = false, sortBy = 'createdAt', sortOrder = 'desc' } = options
+  const { includeMetadata = true, includeImages = false, sortBy = 'createdAt', sortOrder = 'desc', zipFormat = false } = options
   
   let markdown = '# Prompt Manager 导出数据\n\n'
   
@@ -197,7 +199,10 @@ function generateMarkdown(prompts: BasePromptData[], options: MarkdownExportOpti
     
     // 图片
     if (includeImages && prompt.imagePath) {
-      markdown += `**图片:** ${prompt.imagePath}\n\n`
+      const imageName = basename(prompt.imagePath)
+      // 当导出为ZIP时，使用相对路径；否则保持原路径
+      const imagePath = zipFormat ? `images/${imageName}` : prompt.imagePath
+      markdown += `**图片:** ![${imageName}](${imagePath})\n\n`
     }
     
     // 时间信息

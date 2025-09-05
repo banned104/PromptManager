@@ -78,6 +78,7 @@ export interface MarkdownExportOptions {
   groupByTags?: boolean
   sortBy?: 'title' | 'createdAt' | 'updatedAt'
   sortOrder?: 'asc' | 'desc'
+  zipFormat?: boolean
 }
 
 /**
