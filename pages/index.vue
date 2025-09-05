@@ -4,7 +4,7 @@
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Prompt 管理器</h1>
       
       <!-- 工具栏 -->
-      <div class="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm border">
+    <div class="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm border">
         <div class="flex gap-2">
           <n-button
             :type="sortOrder === 'desc' ? 'primary' : 'default'"
@@ -26,6 +26,18 @@
               <n-icon :component="StarIcon" />
             </template>
             {{ showFavoritesOnly ? '显示全部' : '筛选收藏' }}
+          </n-button>
+
+          <!-- 标签筛选按钮 -->
+          <n-button
+            :type="selectedTags.length > 0 ? 'info' : 'default'"
+            @click="toggleTagFilter"
+            size="small"
+          >
+            <template #icon>
+              <n-icon :component="TagIcon" />
+            </template>
+            {{ selectedTags.length > 0 ? `标签 (${selectedTags.length})` : '标签筛选' }}
           </n-button>
           
           <!-- 导入导出按钮组 -->
@@ -57,7 +69,7 @@
         </div>
         
         <div class="text-sm text-gray-500">
-          共 {{ totalCount }} 个 Prompt
+          共 {{ filteredPrompts.length }} 个 Prompt
         </div>
       </div>
       
@@ -90,9 +102,9 @@
     </div>
 
     <!-- Prompt 列表 -->
-    <div v-else-if="displayPrompts.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-else-if="filteredPrompts.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <PromptCard
-        v-for="prompt in displayPrompts"
+        v-for="prompt in filteredPrompts"
         :key="prompt.id"
         :prompt="prompt"
         @edit="handleEdit"
@@ -101,26 +113,8 @@
       />
     </div>
 
-    <!-- 加载更多按钮 -->
-    <div v-if="displayPrompts.length > 0 && hasMore" class="flex justify-center mt-8">
-      <n-button 
-        @click="loadMore" 
-        :loading="loading"
-        size="large"
-        type="primary"
-        ghost
-      >
-        {{ loading ? '加载中...' : '加载更多' }}
-      </n-button>
-    </div>
-
-    <!-- 底部加载状态 -->
-    <div v-if="loading && allPrompts.length > 0" class="flex justify-center py-4">
-      <n-spin size="medium" />
-    </div>
-
     <!-- 空状态 -->
-    <div v-else-if="displayPrompts.length === 0 && !loading" class="text-center py-12">
+    <div v-else-if="filteredPrompts.length === 0 && !loading" class="text-center py-12">
       <n-empty description="暂无 Prompts">
         <template #extra>
           <n-button type="primary" @click="navigateTo('/create')">
@@ -189,13 +183,19 @@
          </n-radio-group>
       </n-space>
     </n-modal>
+
+    <!-- 标签筛选浮窗 -->
+    <TagFilter
+      v-model:visible="showTagFilter"
+      @filter-change="handleTagFilterChange"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon } from '@vicons/ionicons5'
 import { useCache } from '~/composables/useCache'
 
 // 类型定义
@@ -219,16 +219,14 @@ const importLoading = ref(false) // 导入加载状态
 const exportLoading = ref(false) // 导出加载状态
 const showFormatModal = ref(false) // 显示格式选择对话框
 const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选中的格式
+const showTagFilter = ref(false) // 是否显示标签筛选浮窗
+const selectedTags = ref<string[]>([]) // 选中的标签
 const message = useMessage()
 const { cachedFetch, invalidateCache } = useCache()
 
-// 分页相关
-const currentPage = ref(1)
-const pageSize = ref(12)
+// 数据相关
 const allPrompts = ref<Prompt[]>([])
-const totalCount = ref(0)
 const loading = ref(false)
-const hasMore = ref(true)
 
 // 格式选择对话框的Promise resolver
 let formatDialogResolver: ((value: string | null) => void) | null = null
@@ -237,19 +235,62 @@ let formatDialogResolver: ((value: string | null) => void) | null = null
 const debouncedSearch = ref('')
 let searchTimeout: NodeJS.Timeout | null = null
 
-// 计算属性
-const displayPrompts = computed(() => allPrompts.value)
+// 计算属性 - 客户端筛选
+const filteredPrompts = computed(() => {
+  let prompts = allPrompts.value
+  
+  // 搜索筛选
+  if (debouncedSearch.value) {
+    const searchLower = debouncedSearch.value.toLowerCase()
+    prompts = prompts.filter(prompt => 
+      prompt.title.toLowerCase().includes(searchLower) ||
+      prompt.content.toLowerCase().includes(searchLower) ||
+      (prompt.tags && (
+        (typeof prompt.tags === 'string' ? prompt.tags : JSON.stringify(prompt.tags))
+          .toLowerCase().includes(searchLower)
+      ))
+    )
+  }
+  
+  // 收藏筛选
+  if (showFavoritesOnly.value) {
+    prompts = prompts.filter(prompt => prompt.isFavorited)
+  }
+  
+  // 标签筛选
+  if (selectedTags.value.length > 0) {
+    prompts = prompts.filter(prompt => {
+      if (!prompt.tags) return false
+      
+      let promptTags: string[] = []
+      try {
+        promptTags = typeof prompt.tags === 'string' 
+          ? JSON.parse(prompt.tags) 
+          : prompt.tags
+      } catch {
+        promptTags = typeof prompt.tags === 'string' 
+          ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+          : []
+      }
+      
+      // 检查是否包含所有选中的标签
+      return selectedTags.value.every(tag => 
+        promptTags.some(promptTag => promptTag.toLowerCase() === tag.toLowerCase())
+      )
+    })
+  }
+  
+  return prompts
+})
 
-// 数据获取函数
-const fetchPrompts = async (page = 1, reset = false, force = false) => {
+// 获取数据
+const fetchPrompts = async () => {
   if (loading.value) return
   
   loading.value = true
   
   try {
     const params = {
-      page: page.toString(),
-      limit: pageSize.value.toString(),
       search: debouncedSearch.value,
       favorites: showFavoritesOnly.value.toString(),
       sort: sortOrder.value
@@ -258,26 +299,10 @@ const fetchPrompts = async (page = 1, reset = false, force = false) => {
     const response = await cachedFetch<{
        success: boolean
        data: Prompt[]
-       pagination: {
-         total: number
-         page: number
-         limit: number
-         totalPages: number
-         hasNext: boolean
-         hasPrev: boolean
-       }
-     }>('/api/prompts', { params, ttl: 5 * 60 * 1000, force })
+     }>('/api/prompts', { params, ttl: 5 * 60 * 1000 })
     
     if (response.success) {
-      if (reset) {
-        allPrompts.value = response.data
-      } else {
-        allPrompts.value.push(...response.data)
-      }
-      
-      totalCount.value = response.pagination.total
-      hasMore.value = response.pagination.hasNext
-      currentPage.value = response.pagination.page
+      allPrompts.value = response.data
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -287,18 +312,9 @@ const fetchPrompts = async (page = 1, reset = false, force = false) => {
   }
 }
 
-// 加载更多数据
-const loadMore = async () => {
-  if (hasMore.value && !loading.value) {
-    await fetchPrompts(currentPage.value + 1, false)
-  }
-}
-
 // 重置并重新加载数据
-const resetAndFetch = async (force = false) => {
-  currentPage.value = 1
-  hasMore.value = true
-  await fetchPrompts(1, true, force)
+const resetAndFetch = async () => {
+  await fetchPrompts()
 }
 
 // 方法
@@ -320,6 +336,16 @@ const toggleSortOrder = async () => {
 
 const toggleFavoritesFilter = async () => {
   showFavoritesOnly.value = !showFavoritesOnly.value
+  await resetAndFetch()
+}
+
+// 标签筛选相关方法
+const toggleTagFilter = () => {
+  showTagFilter.value = !showTagFilter.value
+}
+
+const handleTagFilterChange = async (tags: string[]) => {
+  selectedTags.value = tags
   await resetAndFetch()
 }
 
@@ -354,18 +380,10 @@ const handleToggleFavorite = async (prompt: Prompt) => {
   }
 }
 
-// 无限滚动处理
+// 监听滚动事件，显示返回顶部按钮
 const handleScroll = () => {
-  showBackToTop.value = window.scrollY > 300
-  
-  // 检查是否需要加载更多
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-  const windowHeight = window.innerHeight
-  const documentHeight = document.documentElement.scrollHeight
-  
-  if (scrollTop + windowHeight >= documentHeight - 200) {
-    loadMore()
-  }
+  showBackToTop.value = scrollTop > 300
 }
 
 // 返回顶部相关方法
@@ -385,18 +403,14 @@ onMounted(async () => {
   const shouldRefresh = route.query.refresh === 'true'
   
   if (shouldRefresh) {
-    // 重置所有状态
-    currentPage.value = 1
-    hasMore.value = true
-    allPrompts.value = []
     // 清除缓存并强制刷新数据
     invalidateCache('prompts')
-    await fetchPrompts(1, true, true)
+    await fetchPrompts()
     // 数据加载完成后再清除URL参数
     await nextTick()
     await navigateTo('/', { replace: true })
   } else {
-    await fetchPrompts(1, true)
+    await fetchPrompts()
   }
 })
 
