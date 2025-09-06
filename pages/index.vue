@@ -40,6 +40,18 @@
             {{ selectedTags.length > 0 ? `标签 (${selectedTags.length})` : '标签筛选' }}
           </n-button>
           
+          <!-- Civitai LORA 按钮 -->
+          <n-button
+            :type="showCivitaiLora ? 'primary' : 'default'"
+            @click="toggleCivitaiLora"
+            size="small"
+          >
+            <template #icon>
+              <n-icon :component="CloudDownloadIcon" />
+            </template>
+            Civitai LORA
+          </n-button>
+          
           <!-- 导入导出按钮组 -->
           <div class="flex items-center gap-1 ml-2">
             <n-button
@@ -189,14 +201,18 @@
       v-model:visible="showTagFilter"
       @filter-change="handleTagFilterChange"
     />
+    
+    <!-- Civitai LORA 浮窗 -->
+    <CivitaiLora v-model:visible="showCivitaiLora" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon, CloudDownload as CloudDownloadIcon } from '@vicons/ionicons5'
 import { useCache } from '~/composables/useCache'
+import CivitaiLora from '~/components/CivitaiLora.vue'
 
 // 类型定义
 interface Prompt {
@@ -221,6 +237,7 @@ const showFormatModal = ref(false) // 显示格式选择对话框
 const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选中的格式
 const showTagFilter = ref(false) // 是否显示标签筛选浮窗
 const selectedTags = ref<string[]>([]) // 选中的标签
+const showCivitaiLora = ref(false) // 是否显示Civitai LORA浮窗
 const message = useMessage()
 const { cachedFetch, invalidateCache } = useCache()
 
@@ -642,6 +659,11 @@ const cancelFormatSelection = () => {
     formatDialogResolver(null)
     formatDialogResolver = null
   }
+}
+
+// 切换Civitai LORA浮窗
+const toggleCivitaiLora = () => {
+  showCivitaiLora.value = !showCivitaiLora.value
 }
 
 // 刷新数据函数

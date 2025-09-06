@@ -73,6 +73,9 @@
         </n-form-item>
       </n-form>
     </n-card>
+    
+    <!-- Civitai LORA 浮窗 -->
+    <CivitaiLora />
   </div>
 </template>
 
@@ -93,6 +96,7 @@ import {
 
 import SmartImageUpload from '@/components/SmartImageUpload.vue'
 import SmartTagInput from '@/components/SmartTagInput.vue'
+import CivitaiLora from '~/components/CivitaiLora.vue'
 import { useCache } from '~/composables/useCache'
 
 // 响应式数据
