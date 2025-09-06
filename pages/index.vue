@@ -3,6 +3,28 @@
     <div class="mb-6">
       <h1 class="text-3xl font-bold text-gray-800 mb-4">Prompt 管理器</h1>
       
+      <!-- Tab 标签页 -->
+      <div class="mb-4">
+        <n-tabs v-model:value="activeTab" type="line" @update:value="handleTabChange">
+          <n-tab-pane name="manual" tab="手动创建">
+            <template #tab>
+              <div class="flex items-center space-x-2">
+                <n-icon :component="AddIcon" />
+                <span>手动创建 ({{ manualPrompts.length }})</span>
+              </div>
+            </template>
+          </n-tab-pane>
+          <n-tab-pane name="civitai" tab="Civitai 获取">
+            <template #tab>
+              <div class="flex items-center space-x-2">
+                <n-icon :component="CloudDownloadIcon" />
+                <span>Civitai 获取 ({{ civitaiPrompts.length }})</span>
+              </div>
+            </template>
+          </n-tab-pane>
+        </n-tabs>
+      </div>
+      
       <!-- 工具栏 -->
     <div class="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm border">
         <div class="flex gap-2">
@@ -209,7 +231,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, useMessage } from 'naive-ui'
+import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, NTabs, NTabPane, useMessage } from 'naive-ui'
 import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon, CloudDownload as CloudDownloadIcon } from '@vicons/ionicons5'
 import { useCache } from '~/composables/useCache'
 import CivitaiLora from '~/components/CivitaiLora.vue'
@@ -238,6 +260,7 @@ const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选�
 const showTagFilter = ref(false) // 是否显示标签筛选浮窗
 const selectedTags = ref<string[]>([]) // 选中的标签
 const showCivitaiLora = ref(false) // 是否显示Civitai LORA浮窗
+const activeTab = ref<'manual' | 'civitai'>('manual') // 当前激活的标签页
 const message = useMessage()
 const { cachedFetch, invalidateCache } = useCache()
 
@@ -252,9 +275,51 @@ let formatDialogResolver: ((value: string | null) => void) | null = null
 const debouncedSearch = ref('')
 let searchTimeout: NodeJS.Timeout | null = null
 
+// 计算属性 - 按标签分类
+const manualPrompts = computed(() => {
+  return allPrompts.value.filter(prompt => {
+    if (!prompt.tags) return true
+    
+    let promptTags: string[] = []
+    try {
+      promptTags = typeof prompt.tags === 'string' 
+        ? JSON.parse(prompt.tags) 
+        : prompt.tags
+    } catch {
+      promptTags = typeof prompt.tags === 'string' 
+        ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        : []
+    }
+    
+    // 不包含Civitai标签的为手动创建
+    return !promptTags.some(tag => tag.toLowerCase() === 'civitai')
+  })
+})
+
+const civitaiPrompts = computed(() => {
+  return allPrompts.value.filter(prompt => {
+    if (!prompt.tags) return false
+    
+    let promptTags: string[] = []
+    try {
+      promptTags = typeof prompt.tags === 'string' 
+        ? JSON.parse(prompt.tags) 
+        : prompt.tags
+    } catch {
+      promptTags = typeof prompt.tags === 'string' 
+        ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+        : []
+    }
+    
+    // 包含Civitai标签的为Civitai获取
+    return promptTags.some(tag => tag.toLowerCase() === 'civitai')
+  })
+})
+
 // 计算属性 - 客户端筛选
 const filteredPrompts = computed(() => {
-  let prompts = allPrompts.value
+  // 根据当前标签页选择数据源
+  let prompts = activeTab.value === 'manual' ? manualPrompts.value : civitaiPrompts.value
   
   // 搜索筛选
   if (debouncedSearch.value) {
@@ -366,6 +431,25 @@ const handleTagFilterChange = async (tags: string[]) => {
   await resetAndFetch()
 }
 
+// Tab切换处理
+const handleTabChange = (value: 'manual' | 'civitai') => {
+  activeTab.value = value
+}
+
+// Civitai LORA按钮处理
+const toggleCivitaiLora = () => {
+  showCivitaiLora.value = !showCivitaiLora.value
+}
+
+// 处理Civitai保存事件
+const handleCivitaiSaved = () => {
+  // 清除缓存并重新获取数据
+  invalidateCache('prompts')
+  fetchPrompts()
+  // 切换到Civitai标签页显示新保存的内容
+  activeTab.value = 'civitai'
+}
+
 const handleToggleFavorite = async (prompt: Prompt) => {
   // 乐观更新：立即更新本地状态
   const index = allPrompts.value.findIndex(p => p.id === prompt.id)
@@ -414,6 +498,12 @@ const scrollToTop = () => {
 // 生命周期
 onMounted(async () => {
   window.addEventListener('scroll', handleScroll)
+  // 添加消息监听器
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'CIVITAI_PROMPT_SAVED') {
+      handleCivitaiSaved()
+    }
+  })
   
   // 检查是否需要强制刷新
   const route = useRoute()
@@ -433,6 +523,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  // 移除消息监听器
+  window.removeEventListener('message', (event) => {
+    if (event.data?.type === 'CIVITAI_PROMPT_SAVED') {
+      handleCivitaiSaved()
+    }
+  })
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
@@ -661,10 +757,7 @@ const cancelFormatSelection = () => {
   }
 }
 
-// 切换Civitai LORA浮窗
-const toggleCivitaiLora = () => {
-  showCivitaiLora.value = !showCivitaiLora.value
-}
+
 
 // 刷新数据函数
 const refresh = async () => {

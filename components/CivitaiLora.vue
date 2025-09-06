@@ -422,6 +422,8 @@ const saveToPrompts = async () => {
     
     if (response.success) {
       message.success('LORA信息已保存为Prompt卡片！')
+      // 通知主页面刷新数据
+      window.postMessage({ type: 'CIVITAI_PROMPT_SAVED' }, '*')
       // 清空当前数据
       modelData.value = null
       inputUrl.value = ''
