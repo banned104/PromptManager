@@ -117,3 +117,76 @@ export function getTrainedWords(model: CivitaiModel): string[] {
   const firstVersion = model.modelVersions?.[0]
   return firstVersion?.trainedWords || []
 }
+
+/**
+ * 获取模型的所有图片（包含参数信息）
+ * @param modelId - 模型 ID
+ * @returns 图片数组，包含 meta 参数信息
+ */
+export async function getCivitaiModelImages(modelId: number): Promise<CivitaiImage[]> {
+  try {
+    const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50`
+    console.log(`🖼️ 获取模型图片: ${apiUrl}`)
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'PromptManager/1.0'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    console.log(`✅ 成功获取 ${data.items?.length || 0} 张图片`)
+    return data.items || []
+  } catch (err: any) {
+    console.error('❌ 获取模型图片失败:', err)
+    throw new Error(`获取模型图片失败: ${err.message}`)
+  }
+}
+
+/**
+ * 从图片 meta 中提取有用的参数
+ */
+export function extractImageParams(image: CivitaiImage) {
+  const meta = image.meta || {}
+  return {
+    prompt: meta.prompt || '',
+    negativePrompt: meta.negativePrompt || '',
+    steps: meta.steps || null,
+    cfgScale: meta.cfgScale || null,
+    sampler: meta.sampler || '',
+    seed: meta.seed || null,
+    size: `${image.width}x${image.height}`,
+    imageUrl: image.url,
+    imageId: image.id
+  }
+}
+
+/**
+ * 获取模型的完整信息（包含图片和参数）
+ */
+export async function getCivitaiModelWithImages(modelUrl: string) {
+  const modelInfo = await getCivitaiModelInfo(modelUrl)
+  if (!modelInfo) return null
+  
+  try {
+    const images = await getCivitaiModelImages(modelInfo.id)
+    const imagesWithParams = images.map(image => ({
+      ...image,
+      params: extractImageParams(image)
+    }))
+    
+    return {
+      ...modelInfo,
+      allImages: imagesWithParams
+    }
+  } catch (error) {
+    console.warn('获取图片参数失败，使用基本模型信息:', error)
+    return modelInfo
+  }
+}

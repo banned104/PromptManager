@@ -151,6 +151,7 @@ interface Prompt {
   title: string
   content: string
   imagePath?: string
+  images?: string  // 新增：多图片字段（JSON格式）
   tags?: string
   isFavorited: boolean
   createdAt: string

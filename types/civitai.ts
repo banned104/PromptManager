@@ -120,3 +120,26 @@ export interface FloatingWindowPosition {
   x: number
   y: number
 }
+
+// 图片参数提取结果
+export interface ImageParams {
+  prompt: string
+  negativePrompt: string
+  steps: number | null
+  cfgScale: number | null
+  sampler: string
+  seed: number | null
+  size: string
+  imageUrl: string
+  imageId: number
+}
+
+// 带参数的图片信息
+export interface CivitaiImageWithParams extends CivitaiImage {
+  params: ImageParams
+}
+
+// 扩展的模型信息（包含所有图片和参数）
+export interface CivitaiModelWithImages extends CivitaiModel {
+  allImages?: CivitaiImageWithParams[]
+}

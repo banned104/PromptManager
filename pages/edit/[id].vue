@@ -56,16 +56,42 @@
                 show-count
               />
               
-              <!-- 高亮文本预览 -->
+              <!-- 内容预览 -->
               <div class="border rounded-lg p-4 bg-gray-50">
-                <div class="text-sm text-gray-600 mb-2">高亮预览：</div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="text-sm text-gray-600">内容预览：</div>
+                  <n-button-group size="tiny">
+                    <n-button 
+                      :type="previewMode === 'highlight' ? 'primary' : 'default'"
+                      @click="previewMode = 'highlight'"
+                    >
+                      高亮模式
+                    </n-button>
+                    <n-button 
+                      :type="previewMode === 'markdown' ? 'primary' : 'default'"
+                      @click="previewMode = 'markdown'"
+                    >
+                      Markdown 模式
+                    </n-button>
+                  </n-button-group>
+                </div>
+                
+                <!-- 高亮文本预览 -->
                 <HighlightableText 
+                  v-if="previewMode === 'highlight'"
                   :text="formData.content" 
                   :highlights="formData.highlights"
                   :editable="true"
                   @update:highlights="handleHighlightsUpdate"
                   class="text-sm text-gray-700 font-mono leading-relaxed min-h-[100px]"
                 />
+                
+                <!-- Markdown 预览 -->
+                <div 
+                  v-else-if="previewMode === 'markdown'"
+                  class="prose prose-sm max-w-none text-gray-700 min-h-[100px]"
+                  v-html="previewMarkdown"
+                ></div>
               </div>
             </div>
           </n-form-item>
@@ -124,9 +150,11 @@ import {
   NBreadcrumbItem,
   NSpin,
   NResult,
+  NButtonGroup,
   useMessage,
   type FormInst
 } from 'naive-ui'
+import { marked } from 'marked'
 import SmartImageUpload from '@/components/SmartImageUpload.vue'
 import SmartTagInput from '@/components/SmartTagInput.vue'
 import HighlightableText from '~/components/HighlightableText.vue'
@@ -148,6 +176,7 @@ const promptId = route.params.id as string
 // 响应式数据
 const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
+const previewMode = ref<'highlight' | 'markdown'>('highlight')
 const { invalidateCache } = useCache()
 
 // 获取数据
@@ -220,6 +249,24 @@ watch(promptData, (newData) => {
     }
   }
 }, { immediate: true })
+
+// Markdown 预览
+const previewMarkdown = computed(() => {
+  if (!formData.content) return '<div class="text-gray-400 italic">暂无内容</div>'
+  
+  try {
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+      sanitize: false
+    })
+    
+    return marked(formData.content)
+  } catch (error) {
+    console.error('Markdown 渲染失败:', error)
+    return formData.content.replace(/\n/g, '<br>')
+  }
+})
 
 // 处理高亮更新
 const handleHighlightsUpdate = (highlights: Highlight[]) => {
