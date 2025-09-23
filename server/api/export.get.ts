@@ -36,15 +36,37 @@ export default defineEventHandler(async (event) => {
     }
 
     // 转换数据格式
-    const exportPrompts: BasePromptData[] = prompts.map(prompt => ({
-      title: prompt.title,
-      content: prompt.content,
-      imagePath: includeImages ? prompt.imagePath : undefined,
-      tags: prompt.tags ? JSON.parse(prompt.tags) : undefined,
-      isFavorited: prompt.isFavorited,
-      createdAt: prompt.createdAt.toISOString(),
-      updatedAt: prompt.updatedAt.toISOString()
-    }))
+    const exportPrompts: BasePromptData[] = prompts.map(prompt => {
+      const baseData: BasePromptData = {
+        title: prompt.title,
+        content: prompt.content,
+        tags: prompt.tags ? JSON.parse(prompt.tags) : undefined,
+        isFavorited: prompt.isFavorited,
+        createdAt: prompt.createdAt.toISOString(),
+        updatedAt: prompt.updatedAt.toISOString()
+      }
+      
+      if (includeImages) {
+        // 处理多图片（向后兼容）
+        if (prompt.images) {
+          try {
+            baseData.images = JSON.parse(prompt.images)
+          } catch {
+            baseData.images = []
+          }
+        }
+        
+        // 向后兼容：如果没有多图片但有单图片，添加到数组中
+        if ((!baseData.images || baseData.images.length === 0) && prompt.imagePath) {
+          baseData.images = [prompt.imagePath]
+        }
+        
+        // 保持向后兼容的 imagePath 字段
+        baseData.imagePath = prompt.imagePath
+      }
+      
+      return baseData
+    })
 
     const timestamp = new Date().toISOString().split('T')[0]
     
@@ -197,12 +219,35 @@ function generateMarkdown(prompts: BasePromptData[], options: MarkdownExportOpti
       markdown += `**收藏:** ⭐\n\n`
     }
     
-    // 图片
-    if (includeImages && prompt.imagePath) {
-      const imageName = basename(prompt.imagePath)
-      // 当导出为ZIP时，使用相对路径；否则保持原路径
-      const imagePath = zipFormat ? `images/${imageName}` : prompt.imagePath
-      markdown += `**图片:** ![${imageName}](${imagePath})\n\n`
+    // 图片（支持多图片）
+    if (includeImages) {
+      const imagesToShow: string[] = []
+      
+      // 优先使用新的 images 字段
+      if (prompt.images && prompt.images.length > 0) {
+        imagesToShow.push(...prompt.images)
+      } else if (prompt.imagePath) {
+        // 向后兼容：使用单图片字段
+        imagesToShow.push(prompt.imagePath)
+      }
+      
+      if (imagesToShow.length > 0) {
+        if (imagesToShow.length === 1) {
+          // 单图片显示
+          const imageName = basename(imagesToShow[0])
+          const imagePath = zipFormat ? `images/${imageName}` : imagesToShow[0]
+          markdown += `**图片:** ![${imageName}](${imagePath})\n\n`
+        } else {
+          // 多图片显示
+          markdown += `**图片 (${imagesToShow.length}张):**\n\n`
+          imagesToShow.forEach((img, idx) => {
+            const imageName = basename(img)
+            const imagePath = zipFormat ? `images/${imageName}` : img
+            markdown += `${idx + 1}. ![${imageName}](${imagePath})\n`
+          })
+          markdown += '\n'
+        }
+      }
     }
     
     // 时间信息

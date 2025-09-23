@@ -39,9 +39,10 @@
         </n-form-item>
 
         <!-- 智能图片上传 -->
-        <n-form-item label="图片" path="imagePath">
+        <n-form-item label="图片" path="images">
           <SmartImageUpload
-            v-model="formData.imagePath"
+            v-model="formData.images"
+            :multiple="true"
             @upload-success="handleUploadSuccess"
             @upload-error="handleUploadError"
           />
@@ -110,7 +111,8 @@ const { invalidateCache } = useCache()
 const formData = reactive({
   title: '',
   content: '',
-  imagePath: '',
+  imagePath: '', // 保持向后兼容
+  images: [] as string[], // 新的多图片字段
   tags: [] as string[]
 })
 
@@ -129,9 +131,20 @@ const rules = {
 }
 
 // 智能上传处理
-const handleUploadSuccess = (url: string, file: File) => {
-  formData.imagePath = url
-  console.log('图片上传成功:', { url, fileName: file.name })
+const handleUploadSuccess = (url: string | string[], file: File | File[]) => {
+  if (Array.isArray(url)) {
+    formData.images = url
+    // 向后兼容：如果只有一张图片，也设置 imagePath
+    formData.imagePath = url[0] || ''
+  } else {
+    formData.images = url ? [url] : []
+    formData.imagePath = url
+  }
+  
+  const fileNames = Array.isArray(file) 
+    ? file.map(f => f.name).join(', ')
+    : file.name
+  console.log('图片上传成功:', { url, fileName: fileNames })
 }
 
 const handleUploadError = (error: string) => {
@@ -150,7 +163,8 @@ const handleSubmit = async () => {
           body: {
             title: formData.title,
             content: formData.content,
-            imagePath: formData.imagePath || null,
+            imagePath: formData.imagePath || null, // 向后兼容
+            images: formData.images.length > 0 ? formData.images : null, // 新的多图片字段
             tags: formData.tags.length > 0 ? formData.tags : null
           }
         })

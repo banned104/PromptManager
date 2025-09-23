@@ -14,7 +14,8 @@ model Prompt {
   id          Int      @id @default(autoincrement())
   title       String
   content     String
-  imagePath   String?  @map("image_path")
+  imagePath   String?  @map("image_path")  // 保持向后兼容，单图片路径
+  images      String?  // JSON格式存储多图片路径数组
   tags        String?  // JSON格式存储标签
   highlights  String?  // JSON格式存储高亮文本信息
   isFavorited Boolean  @default(false) @map("is_favorited")

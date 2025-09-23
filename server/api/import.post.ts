@@ -283,6 +283,13 @@ function validatePromptData(prompt: any, index: number): { isValid: boolean; err
     errors.push(`标签数量不能超过 ${VALIDATION_RULES.tags.maxCount} 个`)
   }
   
+  // 验证多图片字段
+  if (prompt.images && !Array.isArray(prompt.images)) {
+    errors.push('图片列表必须为数组格式')
+  } else if (prompt.images && prompt.images.length > VALIDATION_RULES.images.maxCount) {
+    errors.push(`图片数量不能超过 ${VALIDATION_RULES.images.maxCount} 张`)
+  }
+  
   if (prompt.isFavorited !== undefined && typeof prompt.isFavorited !== 'boolean') {
     errors.push('收藏状态必须为布尔值')
   }
@@ -332,10 +339,32 @@ function parseMarkdownContent(content: string): BasePromptData[] {
       } else if (line.startsWith('**收藏:**')) {
         prompt.isFavorited = line.includes('⭐')
         continue
-      } else if (line.startsWith('**图片:**')) {
-        const imageMatch = line.match(/\*\*图片:\*\*\s*(.+)/)
-        if (imageMatch) {
-          prompt.imagePath = imageMatch[1].trim()
+      } else if (line.startsWith('**图片:**') || line.startsWith('**图片 (')) {
+        if (line.includes('张):')) {
+          // 多图片格式：**图片 (3张):**
+          currentField = 'images'
+          prompt.images = []
+          continue
+        } else {
+          // 单图片格式：**图片:** ![name](path)
+          const imageMatch = line.match(/\*\*图片:\*\*\s*(.+)/)
+          if (imageMatch) {
+            const imgMatch = imageMatch[1].match(/!\[.*?\]\((.+?)\)/)
+            if (imgMatch) {
+              prompt.imagePath = imgMatch[1].trim()
+              prompt.images = [imgMatch[1].trim()]
+            }
+          }
+          continue
+        }
+      } else if (currentField === 'images' && line.match(/^\d+\.\s*!\[.*?\]\(.+?\)/)) {
+        // 解析多图片列表项：1. ![name](path)
+        const imgMatch = line.match(/!\[.*?\]\((.+?)\)/)
+        if (imgMatch && prompt.images) {
+          prompt.images.push(imgMatch[1].trim())
+          if (!prompt.imagePath) {
+            prompt.imagePath = imgMatch[1].trim() // 第一张图片作为主图片
+          }
         }
         continue
       } else if (line.startsWith('**创建时间:**')) {
@@ -386,7 +415,8 @@ async function importPromptsToDatabase(prompts: BasePromptData[], options: Impor
               data: {
                 title: prompt.title,
                 content: prompt.content,
-                imagePath: prompt.imagePath,
+                imagePath: prompt.imagePath, // 向后兼容
+                images: prompt.images ? JSON.stringify(prompt.images) : null, // 新的多图片字段
                 tags: prompt.tags ? JSON.stringify(prompt.tags) : null,
                 isFavorited: prompt.isFavorited || false
               }
@@ -404,7 +434,8 @@ async function importPromptsToDatabase(prompts: BasePromptData[], options: Impor
         data: {
           title: prompt.title,
           content: prompt.content,
-          imagePath: prompt.imagePath,
+          imagePath: prompt.imagePath, // 向后兼容
+          images: prompt.images ? JSON.stringify(prompt.images) : null, // 新的多图片字段
           tags: prompt.tags ? JSON.stringify(prompt.tags) : null,
           isFavorited: prompt.isFavorited || false
         }

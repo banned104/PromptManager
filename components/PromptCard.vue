@@ -24,17 +24,52 @@
       </n-button>
     </div>
     <!-- 图片展示 -->
-    <div v-if="prompt.imagePath" class="mb-4">
-      <NuxtImg 
-        :src="prompt.imagePath" 
-        :alt="prompt.title"
-        class="w-full h-48 object-cover rounded-lg"
-        loading="lazy"
-        placeholder
-        quality="80"
-        format="webp"
-        @error="handleImageError"
-      />
+    <div v-if="displayImages.length > 0" class="mb-4">
+      <!-- 单图片显示（保持原有样式） -->
+      <div v-if="displayImages.length === 1">
+        <NuxtImg 
+          :src="displayImages[0]" 
+          :alt="prompt.title"
+          class="w-full h-48 object-cover rounded-lg"
+          loading="lazy"
+          placeholder
+          quality="80"
+          format="webp"
+          @error="handleImageError"
+        />
+      </div>
+      
+      <!-- 多图片网格显示 -->
+      <div v-else class="images-grid">
+        <div 
+          v-for="(image, index) in displayImages.slice(0, 4)" 
+          :key="index"
+          class="image-grid-item"
+          :class="{
+            'col-span-2': displayImages.length === 2 && index < 2,
+            'main-image': index === 0 && displayImages.length > 2
+          }"
+        >
+          <NuxtImg 
+            :src="image" 
+            :alt="`${prompt.title} - 图片 ${index + 1}`"
+            class="w-full h-full object-cover rounded-lg"
+            loading="lazy"
+            placeholder
+            quality="80"
+            format="webp"
+            @error="handleImageError"
+          />
+          
+          <!-- 更多图片指示器 -->
+          <div 
+            v-if="index === 3 && displayImages.length > 4"
+            class="more-images-overlay"
+          >
+            <span class="more-count">+{{ displayImages.length - 4 }}</span>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- 标题 -->
@@ -136,11 +171,39 @@ defineEmits<{
 // 计算属性
 const parsedTags = computed(() => {
   if (!props.prompt.tags) return []
+  
   try {
-    return JSON.parse(props.prompt.tags)
+    // 尝试解析JSON格式的标签
+    const tags = JSON.parse(props.prompt.tags)
+    return Array.isArray(tags) ? tags : []
   } catch {
-    return []
+    // 如果不是JSON，按逗号分割
+    return props.prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
   }
+})
+
+// 处理多图片显示（向后兼容）
+const displayImages = computed(() => {
+  const images: string[] = []
+  
+  // 优先使用新的 images 字段
+  if (props.prompt.images) {
+    try {
+      const parsedImages = JSON.parse(props.prompt.images)
+      if (Array.isArray(parsedImages)) {
+        images.push(...parsedImages.filter(img => img))
+      }
+    } catch {
+      // 如果解析失败，忽略
+    }
+  }
+  
+  // 向后兼容：如果没有新字段或新字段为空，使用旧的 imagePath
+  if (images.length === 0 && props.prompt.imagePath) {
+    images.push(props.prompt.imagePath)
+  }
+  
+  return images
 })
 
 // 方法
@@ -197,5 +260,51 @@ const viewDetail = () => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 多图片网格样式 */
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  height: 192px; /* 保持与单图片相同的高度 */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.image-grid-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* 两张图片时每张占一半 */
+.image-grid-item.col-span-2 {
+  grid-column: span 1;
+}
+
+/* 三张或更多图片时，第一张占主要位置 */
+.image-grid-item.main-image {
+  grid-row: span 2;
+}
+
+.more-images-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.more-count {
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 </style>

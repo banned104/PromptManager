@@ -73,6 +73,8 @@
           <!-- 图片上传 -->
           <n-form-item label="图片">
             <SmartImageUpload
+              v-model="formData.images"
+              :multiple="true"
               :initial-image="formData.imagePath"
               @upload-success="handleUploadSuccess"
               @upload-error="handleUploadError"
@@ -155,7 +157,8 @@ const { data: promptData, pending, error } = await useFetch(`/api/prompts/${prom
 const formData = reactive({
   title: '',
   content: '',
-  imagePath: '',
+  imagePath: '', // 保持向后兼容
+  images: [] as string[], // 新的多图片字段
   tags: [] as string[],
   highlights: [] as Highlight[]
 })
@@ -177,10 +180,30 @@ const rules = {
 // 监听数据变化，初始化表单
 watch(promptData, (newData) => {
   if (newData?.data && typeof newData.data === 'object' && !Array.isArray(newData.data)) {
-    const data = newData.data as { title: string; content: string; imagePath: string | null; tags: string | null; highlights: string | null }
+    const data = newData.data as { 
+      title: string; 
+      content: string; 
+      imagePath: string | null; 
+      images: string | null;
+      tags: string | null; 
+      highlights: string | null 
+    }
     formData.title = data.title || ''
     formData.content = data.content || ''
     formData.imagePath = data.imagePath || ''
+    
+    // 解析多图片数据（向后兼容）
+    try {
+      if (data.images) {
+        formData.images = JSON.parse(data.images)
+      } else if (data.imagePath) {
+        formData.images = [data.imagePath]
+      } else {
+        formData.images = []
+      }
+    } catch {
+      formData.images = data.imagePath ? [data.imagePath] : []
+    }
     
     // 解析标签
     try {
@@ -204,9 +227,20 @@ const handleHighlightsUpdate = (highlights: Highlight[]) => {
 }
 
 // 智能上传处理
-const handleUploadSuccess = (url: string, file: File) => {
-  formData.imagePath = url
-  console.log('图片上传成功:', { url, fileName: file.name })
+const handleUploadSuccess = (url: string | string[], file: File | File[]) => {
+  if (Array.isArray(url)) {
+    formData.images = url
+    // 向后兼容：如果只有一张图片，也设置 imagePath
+    formData.imagePath = url[0] || ''
+  } else {
+    formData.images = url ? [url] : []
+    formData.imagePath = url
+  }
+  
+  const fileNames = Array.isArray(file) 
+    ? file.map(f => f.name).join(', ')
+    : file.name
+  console.log('图片上传成功:', { url, fileName: fileNames })
 }
 
 const handleUploadError = (error: string) => {
@@ -225,7 +259,8 @@ const handleSubmit = async () => {
       body: {
         title: formData.title,
         content: formData.content,
-        imagePath: formData.imagePath || null,
+        imagePath: formData.imagePath || null, // 向后兼容
+        images: formData.images.length > 0 ? formData.images : null, // 新的多图片字段
         tags: formData.tags.length > 0 ? formData.tags : null,
         highlights: formData.highlights.length > 0 ? formData.highlights : null
       }

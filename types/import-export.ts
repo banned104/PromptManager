@@ -17,7 +17,8 @@ export type SupportedFormat = 'json' | 'markdown' | 'markdown-zip'
 export interface BasePromptData {
   title: string
   content: string
-  imagePath?: string
+  imagePath?: string  // 向后兼容，单图片路径
+  images?: string[]   // 新增：多图片路径数组
   tags?: string[]
   isFavorited?: boolean
   createdAt?: string
@@ -143,6 +144,10 @@ export const VALIDATION_RULES = {
     maxLength: 50
   },
   imagePath: {
+    allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+  },
+  images: {
+    maxCount: 10,
     allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp']
   }
 } as const

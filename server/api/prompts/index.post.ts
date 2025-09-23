@@ -16,7 +16,8 @@ export default defineEventHandler(async (event) => {
       data: {
         title: body.title,
         content: body.content,
-        imagePath: body.imagePath || null,
+        imagePath: body.imagePath || null, // 向后兼容
+        images: body.images ? JSON.stringify(body.images) : null, // 新的多图片字段
         tags: body.tags ? JSON.stringify(body.tags) : null,
         highlights: body.highlights ? JSON.stringify(body.highlights) : null
       }
