@@ -383,15 +383,16 @@
                 type="primary"
                 size="large"
                 block
-                :disabled="selectedImageIds.size === 0 || !modelData"
+                :disabled="!modelData"
                 @click="openSaveDialog"
                 class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
-                :class="{ 'opacity-50 cursor-not-allowed': selectedImageIds.size === 0 || !modelData }"
+                :class="{ 'opacity-50 cursor-not-allowed': !modelData }"
               >
                 <template #icon>
                   <n-icon><SaveIcon /></n-icon>
                 </template>
-                <span v-if="selectedImageIds.size === 0">请先选择图片</span>
+                <span v-if="!modelData">请先获取模型信息</span>
+                <span v-else-if="selectedImageIds.size === 0">保存模型信息 (无图片)</span>
                 <span v-else>保存选中内容 ({{ selectedImageIds.size }} 张图片)</span>
               </n-button>
             </div>
@@ -444,22 +445,22 @@
             <n-space vertical>
               <n-radio value="complete">
                 <div class="flex flex-col">
-                  <span class="font-medium">完整模型信息</span>
-                  <span class="text-sm text-gray-500">包含模型描述、选中图片和所有参数</span>
+                  <span class="font-medium">完整模型信息 ⭐ 推荐</span>
+                  <span class="text-sm text-gray-500">包含模型描述、图片和参数（即使无图片也可保存）</span>
                 </div>
               </n-radio>
               
-              <n-radio value="prompts-only">
+              <n-radio value="prompts-only" :disabled="selectedImages.filter(img => img.params?.prompt).length === 0">
                 <div class="flex flex-col">
                   <span class="font-medium">仅提示词集合</span>
-                  <span class="text-sm text-gray-500">只保存选中图片的提示词，不包含模型描述</span>
+                  <span class="text-sm text-gray-500">只保存有提示词的图片参数（需要有效提示词）</span>
                 </div>
               </n-radio>
               
-              <n-radio value="separate">
+              <n-radio value="separate" :disabled="selectedImages.filter(img => img.params?.prompt).length === 0">
                 <div class="flex flex-col">
                   <span class="font-medium">分别保存</span>
-                  <span class="text-sm text-gray-500">每张图片的参数单独保存为一个 Prompt</span>
+                  <span class="text-sm text-gray-500">每张有参数的图片单独保存为一个 Prompt</span>
                 </div>
               </n-radio>
             </n-space>
@@ -471,13 +472,25 @@
           <h5 class="font-medium mb-2">保存预览</h5>
           <div class="text-sm text-gray-600">
             <div v-if="saveOption === 'complete'">
-              将创建 1 个 Prompt，包含模型完整信息和 {{ selectedImages.length }} 张图片
+              将创建 1 个 Prompt，包含模型完整信息
+              <span v-if="selectedImages.length > 0">和 {{ selectedImages.length }} 张图片</span>
+              <span v-else>（无图片）</span>
             </div>
             <div v-else-if="saveOption === 'prompts-only'">
-              将创建 1 个 Prompt，包含 {{ selectedImages.filter(img => img.params?.prompt).length }} 个有效提示词
+              <span v-if="selectedImages.filter(img => img.params?.prompt).length > 0">
+                将创建 1 个 Prompt，包含 {{ selectedImages.filter(img => img.params?.prompt).length }} 个有效提示词
+              </span>
+              <span v-else class="text-red-500">
+                无有效提示词，请选择其他保存方式
+              </span>
             </div>
             <div v-else-if="saveOption === 'separate'">
-              将创建 {{ selectedImages.filter(img => img.params?.prompt).length }} 个 Prompt，每个包含一张图片和对应参数
+              <span v-if="selectedImages.filter(img => img.params?.prompt).length > 0">
+                将创建 {{ selectedImages.filter(img => img.params?.prompt).length }} 个 Prompt，每个包含一张图片和对应参数
+              </span>
+              <span v-else class="text-red-500">
+                无有效提示词，请选择其他保存方式
+              </span>
             </div>
           </div>
         </div>
@@ -489,12 +502,14 @@
           <n-button
             type="primary"
             :loading="saving"
-            :disabled="!saveOption || selectedImages.length === 0 || !modelData"
+            :disabled="!saveOption || !modelData || ((saveOption === 'prompts-only' || saveOption === 'separate') && selectedImages.length === 0)"
             @click="executeSave"
           >
             <span v-if="saving">保存中...</span>
             <span v-else-if="!saveOption">请选择保存方式</span>
-            <span v-else-if="selectedImages.length === 0">没有选中的图片</span>
+            <span v-else-if="!modelData">模型数据不存在</span>
+            <span v-else-if="(saveOption === 'prompts-only' || saveOption === 'separate') && selectedImages.length === 0">该模式需要选中图片</span>
+            <span v-else-if="saveOption === 'complete'">保存完整模型 ({{ selectedImages.length }} 张图片)</span>
             <span v-else>确认保存 ({{ selectedImages.length }} 张)</span>
           </n-button>
         </div>
@@ -847,9 +862,10 @@ const openSaveDialog = () => {
     return
   }
   
+  // 如果没有图片，默认选择"完整模型"保存方式
   if (selectedImageIds.value.size === 0) {
-    message.warning('请先选择要保存的图片')
-    return
+    console.log('⚠️ 没有选中图片，将默认使用完整模型保存方式')
+    saveOption.value = 'complete'
   }
   
   console.log(`✅ 打开保存对话框`)
@@ -901,7 +917,23 @@ const copyImageToClipboard = async () => {
 
 // 执行保存操作
 const executeSave = async () => {
-  if (!modelData.value || selectedImages.value.length === 0) return
+  console.log('🚀 开始执行保存操作...')
+  console.log(`📊 模型数据存在: ${!!modelData.value}`)
+  console.log(`🖼️ 选中图片数量: ${selectedImages.value.length}`)
+  console.log(`💾 保存选项: ${saveOption.value}`)
+  
+  if (!modelData.value) {
+    console.error('❌ 模型数据不存在')
+    message.error('模型数据不存在，请重新获取模型信息')
+    return
+  }
+  
+  // 对于"仅保存提示词"和"分别保存"模式，需要有图片参数
+  if ((saveOption.value === 'prompts-only' || saveOption.value === 'separate') && selectedImages.value.length === 0) {
+    console.error('❌ 该保存模式需要选中图片')
+    message.error('该保存模式需要选中图片')
+    return
+  }
   
   saving.value = true
   
@@ -934,9 +966,17 @@ const executeSave = async () => {
  const saveCompleteModel = async () => {
    if (!modelData.value) return
    
+   console.log('💾 保存完整模型信息...')
+   console.log(`📊 模型数据:`, modelData.value.name)
+   console.log(`🖼️ 选中图片数量: ${selectedImages.value.length}`)
+   
    const content = buildCompletePromptContent(modelData.value, selectedImages.value)
    const tags = ['Civitai', ...modelData.value.tags.slice(0, 8)]
    const imageUrls = selectedImages.value.map(img => img.url)
+   
+   console.log(`📝 内容长度: ${content.length}`)
+   console.log(`🏷️ 标签: ${JSON.stringify(tags)}`)
+   console.log(`🖼️ 图片URLs: ${JSON.stringify(imageUrls)}`)
    
    await $fetch('/api/prompts', {
      method: 'POST',
@@ -944,10 +984,12 @@ const executeSave = async () => {
        title: modelData.value.name,
        content: content,
        imagePath: imageUrls[0] || null, // 向后兼容
-       images: imageUrls.length > 0 ? imageUrls : null, // 多图片字段
-       tags: tags
+       images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null, // 多图片字段，转为JSON字符串
+       tags: JSON.stringify(tags) // 确保标签是JSON字符串
      }
    })
+   
+   console.log('✅ 完整模型信息保存成功')
  }
 
 // 仅保存提示词集合
@@ -1083,14 +1125,17 @@ const buildCompletePromptContent = (model: CivitaiModelWithImages, images: Civit
     content += `**训练词汇:** \`${words.join('`, `')}\`\n\n`
   }
   
-  // 添加选中图片的生成参数
-  const validImages = images.filter(img => img.params?.prompt)
-  if (validImages.length > 0) {
-    content += `## 生成参数 (${validImages.length} 张图片)\n\n`
+  // 添加选中图片信息
+  if (images.length > 0) {
+    content += `## 图片信息 (${images.length} 张)\n\n`
     
-    validImages.forEach((image, index) => {
-      if (image.params?.prompt) {
-        content += `### 图片 ${index + 1}\n\n`
+    // 有参数的图片
+    const validImages = images.filter(img => img.params?.prompt)
+    if (validImages.length > 0) {
+      content += `### 生成参数 (${validImages.length} 张有参数图片)\n\n`
+      
+      validImages.forEach((image, index) => {
+        content += `#### 图片 ${index + 1}\n\n`
         content += `**正向提示词:**\n\`\`\`\n${image.params.prompt}\n\`\`\`\n\n`
         
         if (image.params.negativePrompt) {
@@ -1104,8 +1149,21 @@ const buildCompletePromptContent = (model: CivitaiModelWithImages, images: Civit
         if (image.params.seed) content += `- 种子: ${image.params.seed}\n`
         content += `- 图片尺寸: ${image.params.size}\n\n`
         content += `---\n\n`
-      }
-    })
+      })
+    }
+    
+    // 没有参数的图片
+    const imagesWithoutParams = images.filter(img => !img.params?.prompt)
+    if (imagesWithoutParams.length > 0) {
+      content += `### 其他图片 (${imagesWithoutParams.length} 张)\n\n`
+      imagesWithoutParams.forEach((image, index) => {
+        content += `- 图片 ${index + 1}: ${image.width}x${image.height}\n`
+      })
+      content += `\n`
+    }
+  } else {
+    content += `## 图片信息\n\n`
+    content += `暂无图片信息\n\n`
   }
   
   // 保存原始的 Markdown 描述内容

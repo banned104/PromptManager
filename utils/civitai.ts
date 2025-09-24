@@ -233,18 +233,26 @@ export async function getCivitaiModelWithImages(modelUrl: string) {
   if (!modelInfo) return null
   
   try {
+    console.log(`🖼️ 尝试获取模型 ${modelInfo.id} 的图片...`)
     const images = await getCivitaiModelImages(modelInfo.id)
     const imagesWithParams = images.map(image => ({
       ...image,
       params: extractImageParams(image)
     }))
     
+    console.log(`✅ 成功获取 ${imagesWithParams.length} 张图片`)
+    
     return {
       ...modelInfo,
       allImages: imagesWithParams
     }
   } catch (error) {
-    console.warn('获取图片参数失败，使用基本模型信息:', error)
-    return modelInfo
+    console.warn('⚠️ 获取图片失败，返回基本模型信息:', error)
+    
+    // 即使获取图片失败，也要确保有allImages数组
+    return {
+      ...modelInfo,
+      allImages: []
+    }
   }
 }

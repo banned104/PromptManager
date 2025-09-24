@@ -11,7 +11,7 @@
     "fix-db": "node scripts/fix-database.js",
     "init-db": "node scripts/init-database.js",
     "clear-cache": "node scripts/clear-all-cache.js",
-    "dev-safe": "npm run init-db && npm run dev",
+    "dev-safe": "npm run fix-db && npm run dev",
     "dev-clean": "npm run clear-cache && npm run init-db && npm run dev"
   },
   "dependencies": {
