@@ -298,18 +298,9 @@ const formatDate = (dateString?: string) => {
 
 const loadDatabaseInfo = async () => {
   try {
-    console.log('🔄 加载数据库信息...')
-    const timestamp = Date.now()
-    const response = await $fetch<{ success: boolean; data: DatabaseInfo }>(`/api/database/info?_t=${timestamp}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    })
+    const response = await $fetch<{ success: boolean; data: DatabaseInfo }>('/api/database/info')
     if (response.success) {
       dbInfo.value = response.data
-      console.log('✅ 数据库信息加载成功:', response.data.statistics)
     }
   } catch (error) {
     console.error('获取数据库信息失败:', error)
@@ -325,19 +316,10 @@ const loadDatabaseRecords = async () => {
   
   loading.value = true
   try {
-    console.log('🔄 加载数据库记录...')
-    const timestamp = Date.now()
-    const response = await $fetch<{ success: boolean; data: DatabaseInfo }>(`/api/database/info?includeData=true&_t=${timestamp}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    })
+    const response = await $fetch<{ success: boolean; data: DatabaseInfo }>('/api/database/info?includeData=true')
     if (response.success && response.data.records) {
       records.value = response.data.records
       showRecords.value = true
-      console.log(`✅ 加载了 ${response.data.records.length} 条记录`)
     }
   } catch (error) {
     console.error('获取数据库记录失败:', error)
@@ -371,22 +353,10 @@ const refreshDatabase = async () => {
 const handleBackup = async () => {
   backupLoading.value = true
   try {
-    console.log('🔄 开始数据库备份...')
-    const timestamp = Date.now()
-    const response = await fetch(`/api/database/backup?_t=${timestamp}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    })
-    
-    console.log('📡 备份API响应状态:', response.status)
+    const response = await fetch('/api/database/backup')
     
     if (response.ok) {
       const blob = await response.blob()
-      console.log('📦 备份文件大小:', blob.size, 'bytes')
-      
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -396,11 +366,8 @@ const handleBackup = async () => {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
       
-      console.log('✅ 备份文件下载完成')
       message.success('数据库备份成功')
     } else {
-      const errorText = await response.text()
-      console.error('❌ 备份API错误:', errorText)
       throw new Error(`备份失败: ${response.status} ${response.statusText}`)
     }
   } catch (error) {

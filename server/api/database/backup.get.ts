@@ -4,21 +4,12 @@ import { join } from 'path'
 
 export default defineEventHandler(async (event) => {
   try {
-    console.log('🔄 开始数据库备份...')
-    
-    // 强制刷新数据库连接
-    await prisma.$disconnect()
-    await prisma.$connect()
-    console.log('✅ 数据库连接已刷新')
-    
     // 获取所有数据
-    console.log('📊 正在获取数据库数据...')
     const prompts = await prisma.prompt.findMany({
       orderBy: {
         id: 'asc'
       }
     })
-    console.log(`📋 获取到 ${prompts.length} 条记录`)
 
     // 创建备份数据结构
     const backupData = {

@@ -2,19 +2,11 @@ import { prisma } from '~/app/lib/prisma'
 
 export default defineEventHandler(async (event) => {
   try {
-    console.log('🔄 开始获取数据库信息...')
     const query = getQuery(event)
     const includeData = query.includeData === 'true'
     
-    // 强制刷新数据库连接
-    await prisma.$disconnect()
-    await prisma.$connect()
-    console.log('✅ 数据库连接已刷新')
-    
     // 获取统计信息
-    console.log('📊 正在统计数据...')
     const totalCount = await prisma.prompt.count()
-    console.log(`📋 总记录数: ${totalCount}`)
     const favoritedCount = await prisma.prompt.count({
       where: { isFavorited: true }
     })

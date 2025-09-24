@@ -261,6 +261,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, NTabs, NTabPane, useMessage } from 'naive-ui'
 import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon, CloudDownload as CloudDownloadIcon, Refresh as RefreshIcon, Server as DatabaseIcon } from '@vicons/ionicons5'
 import { useCache } from '~/composables/useCache'
+import { parseTags, hasTag } from '~/utils/tags'
 import CivitaiLora from '~/components/CivitaiLora.vue'
 
 // 类型定义
@@ -311,9 +312,16 @@ const manualPrompts = computed(() => {
     
     let promptTags: string[] = []
     try {
-      promptTags = typeof prompt.tags === 'string' 
-        ? JSON.parse(prompt.tags) 
-        : prompt.tags
+      if (typeof prompt.tags === 'string') {
+        let parsed = JSON.parse(prompt.tags)
+        // 处理双重JSON编码的情况
+        if (typeof parsed === 'string') {
+          parsed = JSON.parse(parsed)
+        }
+        promptTags = Array.isArray(parsed) ? parsed : [parsed]
+      } else {
+        promptTags = prompt.tags || []
+      }
     } catch {
       promptTags = typeof prompt.tags === 'string' 
         ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
@@ -327,21 +335,8 @@ const manualPrompts = computed(() => {
 
 const civitaiPrompts = computed(() => {
   return allPrompts.value.filter(prompt => {
-    if (!prompt.tags) return false
-    
-    let promptTags: string[] = []
-    try {
-      promptTags = typeof prompt.tags === 'string' 
-        ? JSON.parse(prompt.tags) 
-        : prompt.tags
-    } catch {
-      promptTags = typeof prompt.tags === 'string' 
-        ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-        : []
-    }
-    
     // 包含Civitai标签的为Civitai获取
-    return promptTags.some(tag => tag.toLowerCase() === 'civitai')
+    return hasTag(prompt.tags, 'civitai')
   })
 })
 
@@ -371,18 +366,7 @@ const filteredPrompts = computed(() => {
   // 标签筛选
   if (selectedTags.value.length > 0) {
     prompts = prompts.filter(prompt => {
-      if (!prompt.tags) return false
-      
-      let promptTags: string[] = []
-      try {
-        promptTags = typeof prompt.tags === 'string' 
-          ? JSON.parse(prompt.tags) 
-          : prompt.tags
-      } catch {
-        promptTags = typeof prompt.tags === 'string' 
-          ? prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
-          : []
-      }
+      const promptTags = parseTags(prompt.tags)
       
       // 检查是否包含所有选中的标签
       return selectedTags.value.every(tag => 
@@ -407,8 +391,6 @@ const fetchPrompts = async (forceRefresh = false) => {
       sort: sortOrder.value
     }
     
-    console.log(`🔄 获取Prompts数据 (强制刷新: ${forceRefresh})...`)
-    
     const response = await cachedFetch<{
        success: boolean
        data: Prompt[]
@@ -420,7 +402,6 @@ const fetchPrompts = async (forceRefresh = false) => {
     
     if (response.success) {
       allPrompts.value = response.data
-      console.log(`✅ 获取到 ${response.data.length} 条记录`)
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -806,26 +787,16 @@ const refresh = async () => {
 const handleDatabaseRefresh = async () => {
   refreshLoading.value = true
   try {
-    console.log('🔄 开始数据库刷新...')
-    
     // 调用数据库刷新API
-    const timestamp = Date.now()
-    const response = await $fetch<{ success: boolean; message: string }>(`/api/database/refresh?_t=${timestamp}`, {
-      method: 'POST',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+    const response = await $fetch<{ success: boolean; message: string }>('/api/database/refresh', {
+      method: 'POST'
     })
     
     if (response.success) {
       message.success(response.message)
-      console.log('✅ 数据库刷新成功')
-      
-      // 清除所有缓存并强制重新获取数据
-      invalidateCache() // 清除所有缓存
-      await fetchPrompts(true) // 强制刷新
+      // 清除缓存并重新获取数据
+      invalidateCache('prompts')
+      await fetchPrompts(true)
     }
   } catch (error) {
     console.error('数据库刷新失败:', error)

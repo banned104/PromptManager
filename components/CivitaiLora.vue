@@ -828,15 +828,11 @@ const clearAllCaches = () => {
 
 // 图片选择相关方法
 const toggleImageSelection = (imageId: number) => {
-  console.log(`🔄 切换图片选择状态: ${imageId}`)
   if (selectedImageIds.value.has(imageId)) {
     selectedImageIds.value.delete(imageId)
-    console.log(`❌ 取消选择图片: ${imageId}`)
   } else {
     selectedImageIds.value.add(imageId)
-    console.log(`✅ 选择图片: ${imageId}`)
   }
-  console.log(`📋 当前选中图片数量: ${selectedImageIds.value.size}`)
 }
 
 const selectAllImages = () => {
@@ -852,11 +848,6 @@ const clearImageSelection = () => {
 }
 
 const openSaveDialog = () => {
-  console.log(`🔍 检查保存条件...`)
-  console.log(`📋 选中图片数量: ${selectedImageIds.value.size}`)
-  console.log(`📊 模型数据存在: ${!!modelData.value}`)
-  console.log(`🖼️ 选中的图片:`, Array.from(selectedImageIds.value))
-  
   if (!modelData.value) {
     message.warning('模型数据不存在，请重新获取模型信息')
     return
@@ -864,11 +855,9 @@ const openSaveDialog = () => {
   
   // 如果没有图片，默认选择"完整模型"保存方式
   if (selectedImageIds.value.size === 0) {
-    console.log('⚠️ 没有选中图片，将默认使用完整模型保存方式')
     saveOption.value = 'complete'
   }
   
-  console.log(`✅ 打开保存对话框`)
   showSaveDialog.value = true
 }
 
@@ -917,20 +906,13 @@ const copyImageToClipboard = async () => {
 
 // 执行保存操作
 const executeSave = async () => {
-  console.log('🚀 开始执行保存操作...')
-  console.log(`📊 模型数据存在: ${!!modelData.value}`)
-  console.log(`🖼️ 选中图片数量: ${selectedImages.value.length}`)
-  console.log(`💾 保存选项: ${saveOption.value}`)
-  
   if (!modelData.value) {
-    console.error('❌ 模型数据不存在')
     message.error('模型数据不存在，请重新获取模型信息')
     return
   }
   
   // 对于"仅保存提示词"和"分别保存"模式，需要有图片参数
   if ((saveOption.value === 'prompts-only' || saveOption.value === 'separate') && selectedImages.value.length === 0) {
-    console.error('❌ 该保存模式需要选中图片')
     message.error('该保存模式需要选中图片')
     return
   }
@@ -966,17 +948,9 @@ const executeSave = async () => {
  const saveCompleteModel = async () => {
    if (!modelData.value) return
    
-   console.log('💾 保存完整模型信息...')
-   console.log(`📊 模型数据:`, modelData.value.name)
-   console.log(`🖼️ 选中图片数量: ${selectedImages.value.length}`)
-   
    const content = buildCompletePromptContent(modelData.value, selectedImages.value)
    const tags = ['Civitai', ...modelData.value.tags.slice(0, 8)]
    const imageUrls = selectedImages.value.map(img => img.url)
-   
-   console.log(`📝 内容长度: ${content.length}`)
-   console.log(`🏷️ 标签: ${JSON.stringify(tags)}`)
-   console.log(`🖼️ 图片URLs: ${JSON.stringify(imageUrls)}`)
    
    await $fetch('/api/prompts', {
      method: 'POST',
@@ -984,12 +958,10 @@ const executeSave = async () => {
        title: modelData.value.name,
        content: content,
        imagePath: imageUrls[0] || null, // 向后兼容
-       images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null, // 多图片字段，转为JSON字符串
-       tags: JSON.stringify(tags) // 确保标签是JSON字符串
+       images: imageUrls.length > 0 ? imageUrls : null, // 多图片字段，直接传数组
+       tags: tags // 直接传数组，让API处理JSON转换
      }
    })
-   
-   console.log('✅ 完整模型信息保存成功')
  }
 
 // 仅保存提示词集合
