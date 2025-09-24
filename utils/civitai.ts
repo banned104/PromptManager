@@ -39,40 +39,69 @@ export async function getCivitaiModelInfo(modelUrl: string): Promise<CivitaiMode
 
   console.log(`🔍 获取模型 ID: ${modelId}`)
 
-  try {
-    const apiUrl = `${CIVITAI_API_BASE}/${modelId}`
-    console.log(`🌐 请求API: ${apiUrl}`)
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'PromptManager/1.0'
+  // 重试机制
+  const maxRetries = 3
+  let lastError: any = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 尝试第 ${attempt}/${maxRetries} 次请求...`)
+      
+      // 添加时间戳来绕过缓存
+      const timestamp = Date.now()
+      const apiUrl = `${CIVITAI_API_BASE}/${modelId}?_t=${timestamp}`
+      console.log(`🌐 请求API: ${apiUrl}`)
+      
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Referer': 'https://civitai.com/'
+        },
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      
+      const modelData: CivitaiModel = await response.json()
+      console.log(`✅ 成功获取模型数据 (尝试 ${attempt}/${maxRetries}):`, modelData.name)
+      return modelData
+    } catch (err: any) {
+      lastError = err
+      console.error(`❌ 第 ${attempt}/${maxRetries} 次尝试失败:`, err.message)
+      
+      if (attempt < maxRetries) {
+        const delay = attempt * 2000 // 递增延迟：2s, 4s
+        console.log(`⏳ 等待 ${delay}ms 后重试...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
     }
-    
-    const modelData: CivitaiModel = await response.json()
-    console.log(`✅ 成功获取模型数据:`, modelData)
-    return modelData
-  } catch (err: any) {
-    console.error('❌ 获取模型信息失败:')
-    console.error('URL:', modelUrl)
-    console.error('API URL:', `${CIVITAI_API_BASE}/${modelId}`)
-    console.error('错误详情:', err)
-    
-    if (err.name === 'TypeError' && err.message.includes('fetch')) {
-      throw new Error('网络连接失败，请检查网络连接')
-    } else if (err.message.includes('HTTP 404')) {
-      throw new Error('模型不存在或已被删除')
-    } else if (err.message.includes('HTTP 403')) {
-      throw new Error('访问被拒绝，可能是私有模型')
-    } else {
-      throw new Error(`获取模型信息失败: ${err.message}`)
-    }
+  }
+  
+  // 所有重试都失败了
+  console.error('❌ 所有重试都失败，最后错误:', lastError)
+  
+  if (lastError.name === 'AbortError') {
+    throw new Error('请求超时，请稍后重试')
+  } else if (lastError.name === 'TypeError' && lastError.message.includes('fetch')) {
+    throw new Error('网络连接失败，请检查网络连接或稍后重试')
+  } else if (lastError.message.includes('HTTP 404')) {
+    throw new Error('模型不存在或已被删除')
+  } else if (lastError.message.includes('HTTP 403')) {
+    throw new Error('访问被拒绝，可能是私有模型或需要登录')
+  } else {
+    throw new Error(`获取模型信息失败: ${lastError.message}`)
   }
 }
 
@@ -124,29 +153,58 @@ export function getTrainedWords(model: CivitaiModel): string[] {
  * @returns 图片数组，包含 meta 参数信息
  */
 export async function getCivitaiModelImages(modelId: number): Promise<CivitaiImage[]> {
-  try {
-    const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50`
-    console.log(`🖼️ 获取模型图片: ${apiUrl}`)
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'PromptManager/1.0'
+  const maxRetries = 3
+  let lastError: any = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🖼️ 获取模型图片 (尝试 ${attempt}/${maxRetries})...`)
+      
+      // 添加时间戳来绕过缓存
+      const timestamp = Date.now()
+      const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50&_t=${timestamp}`
+      console.log(`🌐 请求图片API: ${apiUrl}`)
+      
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Referer': 'https://civitai.com/'
+        },
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      
+      const data = await response.json()
+      console.log(`✅ 成功获取 ${data.items?.length || 0} 张图片 (尝试 ${attempt}/${maxRetries})`)
+      return data.items || []
+    } catch (err: any) {
+      lastError = err
+      console.error(`❌ 第 ${attempt}/${maxRetries} 次获取图片失败:`, err.message)
+      
+      if (attempt < maxRetries) {
+        const delay = attempt * 2000 // 递增延迟：2s, 4s
+        console.log(`⏳ 等待 ${delay}ms 后重试...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
     }
-    
-    const data = await response.json()
-    console.log(`✅ 成功获取 ${data.items?.length || 0} 张图片`)
-    return data.items || []
-  } catch (err: any) {
-    console.error('❌ 获取模型图片失败:', err)
-    throw new Error(`获取模型图片失败: ${err.message}`)
   }
+  
+  // 所有重试都失败了，但不抛出错误，返回空数组
+  console.warn('⚠️ 获取图片失败，返回空数组:', lastError?.message)
+  return []
 }
 
 /**

@@ -7,7 +7,12 @@
     "dev": "prisma generate && nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare && prisma generate"
+    "postinstall": "nuxt prepare && prisma generate",
+    "fix-db": "node scripts/fix-database.js",
+    "init-db": "node scripts/init-database.js",
+    "clear-cache": "node scripts/clear-all-cache.js",
+    "dev-safe": "npm run init-db && npm run dev",
+    "dev-clean": "npm run clear-cache && npm run init-db && npm run dev"
   },
   "dependencies": {
     "@nuxt/image": "^1.11.0",

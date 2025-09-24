@@ -74,6 +74,20 @@
             Civitai LORA
           </n-button>
           
+          <!-- 数据库刷新按钮 -->
+          <n-button
+            @click="handleDatabaseRefresh"
+            size="small"
+            type="tertiary"
+            :loading="refreshLoading"
+            title="重新读取数据库"
+          >
+            <template #icon>
+              <n-icon :component="RefreshIcon" />
+            </template>
+            刷新
+          </n-button>
+          
           <!-- 导入导出按钮组 -->
           <div class="flex items-center gap-1 ml-2">
             <n-button
@@ -100,6 +114,19 @@
               导出
             </n-button>
           </div>
+          
+          <!-- 数据库管理按钮 -->
+          <n-button
+            @click="navigateTo('/admin')"
+            size="small"
+            type="tertiary"
+            title="数据库管理"
+          >
+            <template #icon>
+              <n-icon :component="DatabaseIcon" />
+            </template>
+            数据库
+          </n-button>
         </div>
         
         <div class="text-sm text-gray-500">
@@ -232,7 +259,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { NInput, NButton, NIcon, NSpin, NEmpty, NModal, NCard, NRadioGroup, NRadio, NSpace, NTabs, NTabPane, useMessage } from 'naive-ui'
-import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon, CloudDownload as CloudDownloadIcon } from '@vicons/ionicons5'
+import { SearchOutline as SearchIcon, Add as AddIcon, Time as TimeIcon, TimeOutline as TimeReverseIcon, Star as StarIcon, ChevronUp as ChevronUpIcon, CloudDownload as ImportIcon, CloudUpload as ExportIcon, Close as CloseIcon, PricetagOutline as TagIcon, CloudDownload as CloudDownloadIcon, Refresh as RefreshIcon, Server as DatabaseIcon } from '@vicons/ionicons5'
 import { useCache } from '~/composables/useCache'
 import CivitaiLora from '~/components/CivitaiLora.vue'
 
@@ -256,6 +283,7 @@ const showFavoritesOnly = ref(false) // 是否只显示收藏
 const showBackToTop = ref(false) // 是否显示返回顶部按钮
 const importLoading = ref(false) // 导入加载状态
 const exportLoading = ref(false) // 导出加载状态
+const refreshLoading = ref(false) // 刷新加载状态
 const showFormatModal = ref(false) // 显示格式选择对话框
 const selectedFormat = ref<'json' | 'markdown' | 'markdown-zip'>('json') // 选中的格式
 const showTagFilter = ref(false) // 是否显示标签筛选浮窗
@@ -367,7 +395,7 @@ const filteredPrompts = computed(() => {
 })
 
 // 获取数据
-const fetchPrompts = async () => {
+const fetchPrompts = async (forceRefresh = false) => {
   if (loading.value) return
   
   loading.value = true
@@ -379,13 +407,20 @@ const fetchPrompts = async () => {
       sort: sortOrder.value
     }
     
+    console.log(`🔄 获取Prompts数据 (强制刷新: ${forceRefresh})...`)
+    
     const response = await cachedFetch<{
        success: boolean
        data: Prompt[]
-     }>('/api/prompts', { params, ttl: 5 * 60 * 1000 })
+     }>('/api/prompts', { 
+       params, 
+       ttl: 5 * 60 * 1000,
+       force: forceRefresh 
+     })
     
     if (response.success) {
       allPrompts.value = response.data
+      console.log(`✅ 获取到 ${response.data.length} 条记录`)
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -550,7 +585,8 @@ const handleDelete = async (prompt: Prompt) => {
     })
     message.success('删除成功')
     invalidateCache('prompts')
-    // 删除成功，不需要重新获取数据
+    // 删除成功后重新读取数据库以确保数据同步
+    await fetchPrompts()
   } catch (error) {
     // 删除失败，恢复原始状态
     allPrompts.value = originalPrompts
@@ -764,6 +800,39 @@ const cancelFormatSelection = () => {
 const refresh = async () => {
   invalidateCache('prompts')
   await resetAndFetch()
+}
+
+// 数据库刷新功能
+const handleDatabaseRefresh = async () => {
+  refreshLoading.value = true
+  try {
+    console.log('🔄 开始数据库刷新...')
+    
+    // 调用数据库刷新API
+    const timestamp = Date.now()
+    const response = await $fetch<{ success: boolean; message: string }>(`/api/database/refresh?_t=${timestamp}`, {
+      method: 'POST',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
+    
+    if (response.success) {
+      message.success(response.message)
+      console.log('✅ 数据库刷新成功')
+      
+      // 清除所有缓存并强制重新获取数据
+      invalidateCache() // 清除所有缓存
+      await fetchPrompts(true) // 强制刷新
+    }
+  } catch (error) {
+    console.error('数据库刷新失败:', error)
+    message.error('数据库刷新失败，请重试')
+  } finally {
+    refreshLoading.value = false
+  }
 }
 
 // 页面元数据
