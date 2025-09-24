@@ -22,6 +22,16 @@
               首页
             </NuxtLink>
             
+            <!-- NSFW 开关 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-sm text-gray-600">NSFW:</span>
+              <n-switch 
+                v-model:value="nsfwEnabled" 
+                size="small"
+                @update:value="updateNsfwSetting"
+              />
+            </div>
+            
             <NuxtLink 
               to="/create" 
               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -51,7 +61,31 @@
 </template>
 
 <script setup lang="ts">
-import { NMessageProvider } from 'naive-ui'
+import { ref, onMounted } from 'vue'
+import { NMessageProvider, NSwitch } from 'naive-ui'
+
+// NSFW 开关状态
+const nsfwEnabled = ref(false)
+
+// 从 localStorage 恢复 NSFW 设置
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const savedNsfwSetting = localStorage.getItem('civitai-nsfw-enabled')
+    if (savedNsfwSetting !== null) {
+      nsfwEnabled.value = savedNsfwSetting === 'true'
+    }
+  }
+})
+
+// 更新 NSFW 设置
+const updateNsfwSetting = (value: boolean) => {
+  nsfwEnabled.value = value
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('civitai-nsfw-enabled', value.toString())
+    console.log(`🔧 NSFW 设置已更新: ${value ? '启用' : '禁用'}`)
+  }
+}
+
 // 页面元数据
 useHead({
   titleTemplate: '%s - Prompt 管理器',
