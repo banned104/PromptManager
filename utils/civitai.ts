@@ -160,9 +160,9 @@ export async function getCivitaiModelImages(modelId: number): Promise<CivitaiIma
     try {
       console.log(`🖼️ 获取模型图片 (尝试 ${attempt}/${maxRetries})...`)
       
-      // 添加时间戳来绕过缓存
+      // 添加时间戳来绕过缓存，并禁用NSFW过滤
       const timestamp = Date.now()
-      const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50&_t=${timestamp}`
+      const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50&nsfw=true&_t=${timestamp}`
       console.log(`🌐 请求图片API: ${apiUrl}`)
       
       const controller = new AbortController()

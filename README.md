@@ -1,197 +1,331 @@
 # Prompt Manager
 
-一个基于 **Vue 3 + Nuxt 3 + TypeScript + SQLite** 的图片 Prompt 管理器，支持 Prompt 保存、模糊搜索、图片上传与展示，并使用 **Naive UI** 与 **Tailwind CSS** 实现现代化界面。
+一个功能强大的 AI Prompt 管理工具，基于 **Vue 3 + Nuxt 3 + TypeScript + SQLite** 构建，专为 AI 创作者和内容创作者设计。
 
-<img src=".assets/202508300506413.png" alt="image-20250830050641175" style="zoom:50%;" />
+![Prompt Manager](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js)
+![Nuxt](https://img.shields.io/badge/Nuxt-4.0-00DC82?style=flat-square&logo=nuxt.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript)
+![SQLite](https://img.shields.io/badge/SQLite-3.0-003B57?style=flat-square&logo=sqlite)
 
-## 技术栈
+<img src=".assets/202508300506413.png" alt="Prompt Manager 界面预览" style="zoom:50%;" />
 
-| 层        | 主要技术 |
-|-----------|----------|
-| 前端 UI   | Vue 3 · Nuxt 3 · Naive UI · Tailwind CSS |
-| 业务逻辑   | TypeScript · Composition API |
-| 数据持久化 | Prisma ORM · SQLite |
-| 构建工具   | Vite (Nuxt 内建) |
+## ✨ 核心特性
 
-## 目录结构概览
+### 🎯 智能 Prompt 管理
+- **完整的 CRUD 操作** - 创建、查看、编辑、删除 Prompt
+- **多图片支持** - 每个 Prompt 可关联多张图片，支持拖拽上传
+- **智能标签系统** - 自动推荐标签，支持多标签筛选
+- **收藏功能** - 快速标记和访问重要 Prompt
+- **高亮显示** - 支持 Prompt 内容的关键词高亮
+
+### 🔍 强大的搜索与筛选
+- **全文搜索** - 在标题、内容、标签中实时搜索
+- **标签筛选** - 按单个或多个标签组合筛选
+- **收藏筛选** - 快速查看收藏的 Prompt
+- **智能排序** - 按创建时间正序/倒序排列
+- **分类管理** - 手动创建与 Civitai 获取的内容分类显示
+
+### 🌐 Civitai 深度集成
+- **一键获取** - 通过 Civitai 模型链接直接获取 Prompt
+- **模型信息解析** - 自动提取模型名称、描述、示例图片
+- **Prompt 推荐** - 基于模型元数据推荐相关 Prompt
+- **标签自动生成** - 从 Civitai 数据自动生成相关标签
+- **浮窗工具** - 独立的 Civitai 获取工具窗口
+
+### 📁 数据管理与备份
+- **多格式导出** - 支持 JSON、Markdown、ZIP 格式导出
+- **批量导入** - 支持从多种格式批量导入数据
+- **数据备份** - 完整的数据库备份与恢复功能
+- **图片管理** - 自动处理图片存储和路径管理
+- **数据验证** - 导入时自动验证数据完整性
+
+### 🎨 现代化用户体验
+- **响应式设计** - 完美适配桌面和移动设备
+- **暗色主题** - 支持明暗主题切换
+- **拖拽操作** - 支持图片拖拽上传和窗口拖拽
+- **实时预览** - 图片和内容的实时预览
+- **快捷操作** - 丰富的键盘快捷键支持
+
+## 🛠️ 技术架构
+
+### 前端技术栈
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Vue 3 | 3.5+ | 响应式前端框架 |
+| Nuxt 3 | 4.0+ | 全栈框架，SSR/SSG |
+| TypeScript | 5.9+ | 类型安全的 JavaScript |
+| Naive UI | 2.42+ | 现代化 UI 组件库 |
+| Tailwind CSS | 3.0+ | 原子化 CSS 框架 |
+| Vite | 7.1+ | 快速构建工具 |
+
+### 后端技术栈
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Nitro | 内置 | 服务端运行时 |
+| Prisma | 6.15+ | 现代化 ORM |
+| SQLite | 3.0+ | 轻量级数据库 |
+| Sharp | 0.33+ | 高性能图片处理 |
+| Formidable | 3.5+ | 文件上传处理 |
+
+### 核心功能模块
+```
+├── 🎯 Prompt 管理
+│   ├── CRUD 操作
+│   ├── 多图片支持
+│   ├── 标签系统
+│   └── 收藏功能
+├── 🔍 搜索与筛选
+│   ├── 全文搜索
+│   ├── 标签筛选
+│   └── 智能排序
+├── 🌐 Civitai 集成
+│   ├── 模型信息获取
+│   ├── Prompt 提取
+│   └── 自动标签生成
+├── 📁 数据管理
+│   ├── 导入导出
+│   ├── 数据备份
+│   └── 格式转换
+└── 🎨 用户界面
+    ├── 响应式设计
+    ├── 主题切换
+    └── 交互优化
+```
+
+## 🚀 快速开始
+
+### 环境要求
+- **Node.js** 18.0 或更高版本
+- **npm** 或 **pnpm** 包管理器
+- **现代浏览器** 支持 ES2020+
+
+### 安装步骤
+
+1. **克隆项目**
+   ```bash
+   git clone <repository-url>
+   cd prompt-manager
+   ```
+
+2. **安装依赖**
+   ```bash
+   # 使用 npm
+   npm install
+   
+   # 或使用 pnpm (推荐)
+   pnpm install
+   ```
+
+3. **初始化数据库**
+   ```bash
+   # 生成 Prisma 客户端并创建数据库
+   npm run dev
+   ```
+   首次运行会自动创建 SQLite 数据库文件并执行迁移。
+
+4. **启动开发服务器**
+   ```bash
+   npm run dev
+   ```
+   应用将在 `http://localhost:3000` 启动。
+
+### 可用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 启动开发服务器 (热重载) |
+| `npm run build` | 构建生产版本 |
+| `npm run preview` | 预览生产版本 |
+| `npm run fix-db` | 修复数据库问题 |
+| `npm run init-db` | 重新初始化数据库 |
+| `npm run clear-cache` | 清理所有缓存 |
+| `npm run dev-safe` | 安全模式启动 (修复数据库后启动) |
+| `npm run dev-clean` | 清理模式启动 (清理缓存并重新初始化) |
+
+## 📖 使用指南
+
+### 基本操作
+
+#### 创建 Prompt
+1. 点击主界面的 **"新建 Prompt"** 按钮
+2. 填写标题和内容
+3. 可选择上传相关图片 (支持拖拽、粘贴、文件选择)
+4. 添加标签 (系统会自动推荐)
+5. 点击 **"创建"** 完成
+
+#### 搜索与筛选
+- **搜索**: 在搜索框输入关键词，支持标题、内容、标签搜索
+- **标签筛选**: 点击标签筛选按钮，选择一个或多个标签
+- **收藏筛选**: 点击收藏按钮只显示收藏的 Prompt
+- **排序**: 点击排序按钮切换时间排序方式
+
+#### 使用 Civitai 集成
+1. 点击工具栏的 **"Civitai LORA"** 按钮
+2. 在弹出窗口中粘贴 Civitai 模型链接
+   ```
+   示例: https://civitai.com/models/12345
+   ```
+3. 点击 **"获取信息"** 自动解析模型数据
+4. 选择需要的 Prompt 并保存
+
+### 数据管理
+
+#### 导出数据
+1. 点击工具栏的 **"导出"** 按钮
+2. 选择导出格式:
+   - **JSON**: 完整数据，支持重新导入
+   - **Markdown**: 文档格式，便于阅读
+   - **ZIP**: 包含图片的完整备份
+3. 点击 **"确认导出"** 下载文件
+
+#### 导入数据
+1. 点击工具栏的 **"导入"** 按钮
+2. 选择文件 (支持 .json, .md, .markdown, .zip)
+3. 系统自动解析并导入数据
+4. 查看导入统计报告
+
+## 🗂️ 项目结构
 
 ```
-├── app/                # Nuxt 入口(保持默认)
-├── assets/             # 静态样式与资源
-├── components/         # 全局/局部组件
-│   └── PromptCard.vue  # Prompt 展示卡片
-├── layouts/            # 布局组件 (默认 layout 已集成 n-message-provider)
-├── pages/              # 业务页面 (CRUD、搜索)
-├── plugins/            # 客户端插件 (Naive UI SSR 样式注入)
-├── prisma/             # Prisma schema & 数据库文件
-├── server/api/         # Nitro API 路由 (REST 风格)
-├── tailwind.config.js  # Tailwind 配置
-├── nuxt.config.ts      # Nuxt 全局配置
-└── README.md           # 当前文档
+prompt-manager/
+├── 📁 app/                    # Nuxt 应用入口
+│   ├── app.vue               # 根组件
+│   └── lib/
+│       └── prisma.ts         # Prisma 客户端配置
+├── 📁 assets/                # 静态资源
+│   └── css/
+│       └── main.css          # 全局样式
+├── 📁 components/            # Vue 组件
+│   ├── CivitaiLora.vue      # Civitai 集成工具
+│   ├── PromptCard.vue       # Prompt 卡片组件
+│   ├── SmartImageUpload.vue # 智能图片上传
+│   ├── SmartTagInput.vue    # 智能标签输入
+│   └── TagFilter.vue        # 标签筛选器
+├── 📁 composables/           # 组合式函数
+│   ├── useCache.ts          # 缓存管理
+│   └── useClipboardImage.ts # 剪贴板图片处理
+├── 📁 layouts/               # 布局组件
+│   └── default.vue          # 默认布局
+├── 📁 pages/                 # 页面组件
+│   ├── index.vue            # 主页
+│   ├── create.vue           # 创建页面
+│   ├── admin.vue            # 管理页面
+│   └── edit/[id].vue        # 编辑页面
+├── 📁 prisma/                # 数据库相关
+│   ├── schema.prisma        # 数据库模式
+│   ├── migrations/          # 数据库迁移
+│   └── dev.db              # SQLite 数据库文件
+├── 📁 server/api/            # API 路由
+│   ├── prompts/             # Prompt 相关 API
+│   ├── database/            # 数据库管理 API
+│   ├── civitai/             # Civitai 集成 API
+│   ├── upload/              # 文件上传 API
+│   ├── import.post.ts       # 数据导入
+│   └── export.get.ts        # 数据导出
+├── 📁 types/                 # TypeScript 类型定义
+│   ├── civitai.ts           # Civitai 相关类型
+│   └── import-export.ts     # 导入导出类型
+├── 📁 utils/                 # 工具函数
+│   ├── civitai.ts           # Civitai 工具函数
+│   └── tags.ts              # 标签处理工具
+└── 📁 scripts/               # 脚本文件
+    ├── init-database.js     # 数据库初始化
+    ├── fix-database.js      # 数据库修复
+    └── clear-all-cache.js   # 缓存清理
 ```
 
-## 核心架构说明
+## 🔧 配置说明
 
-1. **页面渲染**  
-   Nuxt 采用 SSR / SSG，默认开启 `ssr: true`，既保证首屏速度又利于 SEO。
-
-2. **组件通信**  
-   主要使用 `defineProps` + `emit`，必要时使用 Pinia／Provide-Inject（当前项目暂未使用 Pinia）。
-
-3. **消息提示**  
-   在 `layouts/default.vue` 中包裹 `<n-message-provider>`，各页面可通过 `useMessage()` 触发成功/失败提示。
-
-4. **数据层**  
-   `Prisma` 负责模型定义与数据库迁移，`/server/api` 目录下的 Route Handler 直接使用 Prisma Client 进行 CRUD。
-
-5. **文件上传**  
-   通过 `@multipart/form-data` 解析后保存到 `public/uploads`，数据库中仅存储相对路径。
-
-## 本地开发
-
-```bash
-# 安装依赖
-pnpm install        # 推荐使用 pnpm，也可使用 npm/yarn/bun
-
-# 启动开发服务器
-pnpm dev            # http://localhost:3000
-```
-
-> 初次运行会自动生成 `prisma/dev.db` 数据库文件。
-
-### 常用脚本
-
-| 命令             | 说明                              |
-|------------------|-----------------------------------|
-| `pnpm dev`       | 启动本地开发服务器 (热更新)        |
-| `pnpm build`     | 构建生产包                         |
-| `pnpm preview`   | 预览生产包 (本地 SSR)             |
-| `pnpm prisma`    | Prisma CLI，例如 `pnpm prisma studio` 查看数据 |
-
-## 数据库迁移
-
-```bash
-# 修改 prisma/schema.prisma 后
-pnpm prisma migrate dev --name <migration-name>
-```
-
-## 环境变量
-
-```
-# .env
+### 环境变量
+创建 `.env` 文件配置环境变量:
+```env
+# 数据库配置
 DATABASE_URL="file:./prisma/dev.db"
+
+# 应用配置
+NUXT_PUBLIC_API_BASE="/api"
 ```
 
-> 若切换到生产环境，可将 `DATABASE_URL` 指向外部 SQLite 文件或其他数据库，并在 `prisma/schema.prisma` 中调整 provider。
+### 数据库配置
+数据库模式定义在 `prisma/schema.prisma`:
+```prisma
+model Prompt {
+  id          Int      @id @default(autoincrement())
+  title       String   // Prompt 标题
+  content     String   // Prompt 内容
+  imagePath   String?  // 单图片路径 (向后兼容)
+  images      String?  // 多图片路径 (JSON 格式)
+  tags        String?  // 标签 (JSON 格式)
+  highlights  String?  // 高亮信息 (JSON 格式)
+  isFavorited Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+```
 
-## 部署
+## 🚀 部署指南
 
-1. 执行 `pnpm build` 生成 `.output`。  
-2. 产物符合 [Nitro preset](https://nitro.unjs.io/) 规范，可部署到 Node 服务器、Docker、Vercel、Netlify 等平台。  
-3. 生产环境需执行 `node .output/server/index.mjs` 启动。
+### 生产环境部署
 
----
+1. **构建应用**
+   ```bash
+   npm run build
+   ```
 
-## TODO
+2. **启动生产服务器**
+   ```bash
+   node .output/server/index.mjs
+   ```
 
+### Docker 部署
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]
+```
 
+### 平台部署
+- **Vercel**: 支持零配置部署
+- **Netlify**: 支持静态生成部署
+- **Railway**: 支持全栈应用部署
+- **自托管**: 支持 Node.js 服务器部署
 
+## 🤝 贡献指南
 
-基于你现有的 Vue + Nuxt.js + TypeScript + SQLite 的 Prompt 管理器项目，我建议以下功能扩展来提升易用性和稳定性：
+我们欢迎所有形式的贡献！
 
-## 🚀 核心功能增强
+### 开发流程
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
-### 1. 智能搜索与分类
-- **语义搜索**：集成向量数据库（如 Chroma），支持基于语义相似度的搜索
-- **智能标签**：自动从 Prompt 内容中提取关键词生成标签
-- **分类管理**：支持自定义分类和层级结构
-- **收藏夹**：快速访问常用 Prompt
+### 代码规范
+- 使用 TypeScript 进行类型安全开发
+- 遵循 Vue 3 Composition API 最佳实践
+- 使用 ESLint 和 Prettier 保持代码风格一致
+- 编写清晰的提交信息
 
-### 2. 批量操作与导入导出
-- **批量导入**：支持从 CSV、JSON 格式批量导入 Prompt
-- **批量编辑**：选中多个 Prompt 进行批量标签修改
-- **导出功能**：支持导出为多种格式（JSON、CSV、Markdown）
-- **备份恢复**：一键备份和恢复数据
+## 📄 许可证
 
-## 💡 易用性提升
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-### 3. 用户体验优化
-- **快捷键支持**：常用操作的键盘快捷键
-- **拖拽上传**：支持拖拽图片直接上传
-- **预览模式**：Prompt 效果预览（如果是 AI 绘画 Prompt）
-- **历史记录**：搜索历史和使用频率统计
-- **暗黑模式**：支持主题切换
+## 🙏 致谢
 
-### 4. 协作与分享
-- **分享链接**：生成 Prompt 分享链接
-- **模板库**：内置常用 Prompt 模板
-- **社区功能**：用户可以分享和发现优质 Prompt
-- **版本控制**：Prompt 的修改历史追踪
-
-## 🛡️ 稳定性与性能
-
-### 5. 数据安全与备份
-- **自动备份**：定时自动备份数据库
-- **数据验证**：输入数据的格式验证和清理
-- **错误恢复**：操作失败时的回滚机制
-- **数据迁移**：支持从其他 Prompt 管理工具迁移
-
-### 6. 性能优化
-- **虚拟滚动**：大量数据时的性能优化
-- **图片懒加载**：优化图片加载性能
-- **缓存策略**：合理的前端缓存机制
-- **分页加载**：避免一次性加载过多数据
-
-## 🔧 技术架构增强
-
-### 7. 系统监控与日志
-- **错误监控**：集成 Sentry 等错误追踪工具
-- **性能监控**：页面加载时间和用户行为分析
-- **操作日志**：记录用户的关键操作
-- **健康检查**：系统状态监控接口
-
-### 8. 扩展性设计
-- **插件系统**：支持第三方插件扩展功能
-- **API 接口**：提供 RESTful API 供其他工具调用
-- **Webhook 支持**：与其他系统集成的回调机制
-- **多数据库支持**：除 SQLite 外支持 PostgreSQL、MySQL
-
-## 🎯 高级功能
-
-### 9. AI 集成
-- **Prompt 优化建议**：AI 分析并提供 Prompt 改进建议
-- **自动标签生成**：基于内容自动生成相关标签
-- **相似 Prompt 推荐**：基于用户行为推荐相关 Prompt
-- **质量评分**：AI 评估 Prompt 的质量和效果
-
-### 10. 移动端支持
-- **PWA 支持**：渐进式 Web 应用，支持离线使用
-- **响应式设计**：完美适配移动设备
-- **触摸优化**：针对触摸操作的界面优化
-
-## 📊 数据分析
-
-### 11. 统计与分析
-- **使用统计**：Prompt 使用频率和效果统计
-- **趋势分析**：热门标签和 Prompt 趋势
-- **用户行为分析**：搜索模式和使用习惯分析
-
-## 🔒 安全性
-
-### 12. 安全增强
-- **用户认证**：支持多种登录方式（OAuth、JWT）
-- **权限管理**：细粒度的权限控制
-- **数据加密**：敏感数据的加密存储
-- **访问控制**：IP 白名单和访问频率限制
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [Nuxt.js](https://nuxt.com/) - 直观的 Vue 框架
+- [Naive UI](https://www.naiveui.com/) - Vue 3 组件库
+- [Prisma](https://www.prisma.io/) - 下一代 ORM
+- [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
+- [Civitai](https://civitai.com/) - AI 模型分享平台
 
 ---
 
-**实施建议**：
-1. **优先级排序**：先实现核心功能增强（搜索、批量操作）
-2. **渐进式开发**：采用敏捷开发，小步快跑
-3. **用户反馈**：及时收集用户反馈，调整功能优先级
-4. **性能优先**：在添加新功能时始终考虑性能影响
-5. **代码质量**：保持代码的可维护性和可测试性
-
-这些功能扩展都遵循 "Less is More" 的哲学，每个功能都有明确的价值和用途，避免功能冗余，确保系统的简洁性和高效性。
+**如果这个项目对你有帮助，请给它一个 ⭐️！**
         
