@@ -24,23 +24,37 @@
       </n-button>
     </div>
     <!-- 图片展示 -->
-    <div v-if="displayImages.length > 0" class="mb-4">
+    <div v-if="displayImages.length > 0" class="mb-4 relative">
       <!-- 单图片显示（保持原有样式） -->
-      <div v-if="displayImages.length === 1">
+      <div v-if="displayImages.length === 1" class="relative">
         <NuxtImg 
           :src="displayImages[0]" 
           :alt="prompt.title"
-          class="w-full h-48 object-cover rounded-lg"
+          :class="[
+            'w-full h-48 object-cover rounded-lg transition-all duration-300',
+            { 'blur-lg': shouldBlur }
+          ]"
           loading="lazy"
           placeholder
           quality="80"
           format="webp"
           @error="handleImageError"
         />
+        <!-- NSFW遮罩 -->
+        <div 
+          v-if="shouldBlur" 
+          class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center"
+        >
+          <div class="text-white text-center">
+            <div class="text-lg font-semibold mb-1">🔞</div>
+            <div class="text-sm">NSFW内容已隐藏</div>
+            <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
+          </div>
+        </div>
       </div>
       
       <!-- 多图片网格显示 -->
-      <div v-else class="images-grid">
+      <div v-else class="images-grid relative">
         <div 
           v-for="(image, index) in displayImages.slice(0, 4)" 
           :key="index"
@@ -53,7 +67,10 @@
           <NuxtImg 
             :src="image" 
             :alt="`${prompt.title} - 图片 ${index + 1}`"
-            class="w-full h-full object-cover rounded-lg"
+            :class="[
+              'w-full h-full object-cover rounded-lg transition-all duration-300',
+              { 'blur-lg': shouldBlur }
+            ]"
             loading="lazy"
             placeholder
             quality="80"
@@ -67,6 +84,18 @@
             class="more-images-overlay"
           >
             <span class="more-count">+{{ displayImages.length - 4 }}</span>
+          </div>
+        </div>
+        
+        <!-- 多图片NSFW遮罩 -->
+        <div 
+          v-if="shouldBlur" 
+          class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center z-10"
+        >
+          <div class="text-white text-center">
+            <div class="text-lg font-semibold mb-1">🔞</div>
+            <div class="text-sm">NSFW内容已隐藏</div>
+            <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
           </div>
         </div>
       </div>
@@ -141,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { NCard, NTag, NSpace, NButton, NButtonGroup, NIcon, NPopconfirm } from 'naive-ui'
 import { Eye as EyeIcon, Create as EditIcon, Trash as DeleteIcon, Star as StarIcon, StarOutline as StarOutlineIcon } from '@vicons/ionicons5'
 
@@ -169,6 +198,20 @@ defineEmits<{
   toggleFavorite: [prompt: Prompt]
 }>()
 
+// NSFW状态管理
+const nsfwEnabled = ref(true)
+
+// 监听localStorage变化
+const updateNsfwState = () => {
+  const stored = localStorage.getItem('civitai-nsfw-enabled')
+  nsfwEnabled.value = stored === 'true'
+}
+
+// 监听自定义NSFW状态变化事件
+const handleNsfwChange = (event: CustomEvent) => {
+  nsfwEnabled.value = event.detail.enabled
+}
+
 // 计算属性
 const parsedTags = computed(() => {
   if (!props.prompt.tags) return []
@@ -181,6 +224,20 @@ const parsedTags = computed(() => {
     // 如果不是JSON，按逗号分割
     return props.prompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
   }
+})
+
+// 检查是否包含NSFW标签
+const hasNsfwTag = computed(() => {
+  return parsedTags.value.some(tag => 
+    tag.toLowerCase().includes('nsfw') || 
+    tag.toLowerCase().includes('adult') ||
+    tag.toLowerCase().includes('explicit')
+  )
+})
+
+// 是否应该模糊显示
+const shouldBlur = computed(() => {
+  return hasNsfwTag.value && !nsfwEnabled.value
 })
 
 // 处理多图片显示（向后兼容）
@@ -239,6 +296,18 @@ const handleImageError = (event: Event) => {
 const viewDetail = () => {
   navigateTo(`/prompt/${props.prompt.id}`)
 }
+
+// 生命周期钩子
+onMounted(() => {
+  updateNsfwState()
+  window.addEventListener('storage', updateNsfwState)
+  window.addEventListener('nsfwSettingChanged', handleNsfwChange as EventListener)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', updateNsfwState)
+  window.removeEventListener('nsfwSettingChanged', handleNsfwChange as EventListener)
+})
 </script>
 
 <style scoped>

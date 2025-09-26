@@ -83,6 +83,11 @@ const updateNsfwSetting = (value: boolean) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('civitai-nsfw-enabled', value.toString())
     console.log(`🔧 NSFW 设置已更新: ${value ? '启用' : '禁用'}`)
+    
+    // 触发自定义事件通知其他组件
+    window.dispatchEvent(new CustomEvent('nsfwSettingChanged', {
+      detail: { enabled: value }
+    }))
   }
 }
 

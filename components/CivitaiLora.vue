@@ -339,6 +339,18 @@
                   <div><strong>版本名称:</strong> {{ modelData.modelVersions[0].name }}</div>
                   <div><strong>基础模型:</strong> {{ modelData.modelVersions[0].baseModel }}</div>
                   <div><strong>下载次数:</strong> {{ formatNumber(modelData.modelVersions[0].stats.downloadCount) }}</div>
+                  <!-- 显示.safetensors文件名 -->
+                  <div v-if="getSafetensorsFiles(modelData.modelVersions[0]).length > 0">
+                    <strong>模型文件:</strong>
+                    <span 
+                      v-for="(file, index) in getSafetensorsFiles(modelData.modelVersions[0])" 
+                      :key="file.id"
+                      class="inline-block"
+                    >
+                      <span v-if="index > 0">, </span>
+                      <code class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1 py-0.5 rounded text-xs font-bold">{{ file.name }}</code>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -871,6 +883,13 @@ const formatNumber = (num: number): string => {
   return num.toString()
 }
 
+// 获取.safetensors文件列表
+const getSafetensorsFiles = (version: any) => {
+  return version.files?.filter((file: any) => 
+    file.name.toLowerCase().endsWith('.safetensors')
+  ) || []
+}
+
 
 
 const copyToClipboard = async (text: string) => {
@@ -1088,7 +1107,23 @@ const buildCompletePromptContent = (model: CivitaiModelWithImages, images: Civit
     const version = model.modelVersions[0]
     content += `**版本信息:**\n`
     content += `- 版本名称: ${version.name}\n`
-    content += `- 基础模型: ${version.baseModel}\n\n`
+    content += `- 基础模型: ${version.baseModel}\n`
+    
+    // 添加.safetensors文件名信息
+    const safetensorsFiles = version.files?.filter(file => 
+      file.name.toLowerCase().endsWith('.safetensors')
+    ) || []
+    
+    if (safetensorsFiles.length > 0) {
+      content += `- **模型文件:** `
+      safetensorsFiles.forEach((file, index) => {
+        if (index > 0) content += `, `
+        content += `**\`${file.name}\`**`
+      })
+      content += `\n`
+    }
+    
+    content += `\n`
   }
   
   // 添加训练词汇
