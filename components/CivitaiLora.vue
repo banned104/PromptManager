@@ -65,14 +65,14 @@
               v-model:value="inputUrl"
               placeholder="请输入 Civitai 模型页面链接，如：https://civitai.com/models/12345"
               :disabled="loading"
-              @keyup.enter="fetchModelInfo"
+              @keyup.enter="() => fetchModelInfo()"
               class="flex-1"
             />
             <n-button
               type="primary"
               :loading="loading"
               :disabled="!inputUrl.trim() || !isValidUrl"
-              @click="fetchModelInfo"
+              @click="() => fetchModelInfo()"
             >
               获取信息
             </n-button>
@@ -230,8 +230,13 @@
                     </div>
                     
                     <!-- 参数指示器 -->
-                    <div v-if="image.params?.prompt" class="absolute bottom-1 left-1">
-                      <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div v-if="hasValidParams(image)" class="absolute bottom-1 left-1">
+                      <div class="w-2 h-2 bg-blue-500 rounded-sm"></div>
+                    </div>
+                    
+                    <!-- 分辨率指示器 -->
+                    <div class="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                      {{ image.width }}×{{ image.height }}
                     </div>
                   </div>
                 </div>
@@ -260,9 +265,32 @@
               </div>
               
               <!-- 图片参数信息 -->
-              <div v-if="currentImageParams" class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
-                <h5 class="font-medium text-blue-900 dark:text-blue-100 mb-2">生成参数</h5>
-                <div class="space-y-2 text-sm">
+              <div v-if="currentSelectedImage" class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+                <h5 class="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  当前图片信息 
+                  <span class="text-sm font-normal">
+                    ({{ currentSelectedImage.width }}×{{ currentSelectedImage.height }})
+                  </span>
+                </h5>
+                
+                <!-- 参数完整性指示 -->
+                <div class="mb-2">
+                  <span v-if="hasValidParams(currentSelectedImage)" class="inline-flex items-center px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+                    <div class="w-2 h-2 bg-green-500 rounded-sm mr-1"></div>
+                    完整参数
+                  </span>
+                  <span v-else-if="currentSelectedImage.params?.prompt" class="inline-flex items-center px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800">
+                    <div class="w-2 h-2 bg-yellow-500 rounded-sm mr-1"></div>
+                    仅有提示词
+                  </span>
+                  <span v-else class="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+                    <div class="w-2 h-2 bg-gray-500 rounded-sm mr-1"></div>
+                    无参数信息
+                  </span>
+                </div>
+                
+                <!-- 参数详情 -->
+                <div v-if="currentImageParams" class="space-y-2 text-sm">
                   <div v-if="currentImageParams.prompt" class="space-y-1">
                     <div class="font-medium text-blue-800 dark:text-blue-200">正向提示词:</div>
                     <div class="bg-white dark:bg-gray-800 p-2 rounded text-gray-700 dark:text-gray-300 font-mono text-xs break-all">
@@ -363,7 +391,7 @@
                  <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded text-xs">
                    📋 已选择 {{ selectedImageIds.size }} 张图片<br>
                    🖼️ 当前查看: 第 {{ selectedImageIndex + 1 }} 张<br>
-                   📝 有参数的图片: {{ modelData.allImages?.filter(img => img.params?.prompt).length || 0 }} 张
+                   📝 有完整参数的图片: {{ modelData.allImages?.filter(img => hasValidParams(img)).length || 0 }} 张
                  </div>
                </div>
               
@@ -462,17 +490,17 @@
                 </div>
               </n-radio>
               
-              <n-radio value="prompts-only" :disabled="selectedImages.filter(img => img.params?.prompt).length === 0">
+              <n-radio value="prompts-only" :disabled="selectedImages.filter(img => hasValidParams(img)).length === 0">
                 <div class="flex flex-col">
                   <span class="font-medium">仅提示词集合</span>
-                  <span class="text-sm text-gray-500">只保存有提示词的图片参数（需要有效提示词）</span>
+                  <span class="text-sm text-gray-500">只保存有完整参数的图片（需要有效提示词）</span>
                 </div>
               </n-radio>
               
-              <n-radio value="separate" :disabled="selectedImages.filter(img => img.params?.prompt).length === 0">
+              <n-radio value="separate" :disabled="selectedImages.filter(img => hasValidParams(img)).length === 0">
                 <div class="flex flex-col">
                   <span class="font-medium">分别保存</span>
-                  <span class="text-sm text-gray-500">每张有参数的图片单独保存为一个 Prompt</span>
+                  <span class="text-sm text-gray-500">每张有完整参数的图片单独保存为一个 Prompt</span>
                 </div>
               </n-radio>
             </n-space>
@@ -489,16 +517,16 @@
               <span v-else>（无图片）</span>
             </div>
             <div v-else-if="saveOption === 'prompts-only'">
-              <span v-if="selectedImages.filter(img => img.params?.prompt).length > 0">
-                将创建 1 个 Prompt，包含 {{ selectedImages.filter(img => img.params?.prompt).length }} 个有效提示词
+              <span v-if="selectedImages.filter(img => hasValidParams(img)).length > 0">
+                将创建 1 个 Prompt，包含 {{ selectedImages.filter(img => hasValidParams(img)).length }} 个有效提示词
               </span>
               <span v-else class="text-red-500">
                 无有效提示词，请选择其他保存方式
               </span>
             </div>
             <div v-else-if="saveOption === 'separate'">
-              <span v-if="selectedImages.filter(img => img.params?.prompt).length > 0">
-                将创建 {{ selectedImages.filter(img => img.params?.prompt).length }} 个 Prompt，每个包含一张图片和对应参数
+              <span v-if="selectedImages.filter(img => hasValidParams(img)).length > 0">
+                将创建 {{ selectedImages.filter(img => hasValidParams(img)).length }} 个 Prompt，每个包含一张图片和对应参数
               </span>
               <span v-else class="text-red-500">
                 无有效提示词，请选择其他保存方式
@@ -603,8 +631,8 @@ const renderedMarkdown = computed(() => {
     // 配置 marked 选项
     marked.setOptions({
       breaks: true,
-      gfm: true,
-      sanitize: false // 注意：在生产环境中可能需要启用sanitize
+      gfm: true
+      // sanitize: false // 注意：在生产环境中可能需要启用sanitize
     })
     
     // 渲染 Markdown
@@ -756,14 +784,30 @@ const fetchModelInfo = async (forceRefresh = false) => {
     selectedImageIndex.value = 0 // 重置选中的图片索引
     selectedImageIds.value.clear() // 清空图片选择
     
-    // 自动选中所有图片（特别是单张图片的情况）
+    // 智能选择策略：优先选择有完整参数的图片
     if (data?.allImages && data.allImages.length > 0) {
-      console.log(`🖼️ 自动选中 ${data.allImages.length} 张图片`)
       selectedImageIds.value.clear() // 先清空
-      data.allImages.forEach(image => {
-        selectedImageIds.value.add(image.id)
-        console.log(`✅ 选中图片 ID: ${image.id}`)
-      })
+      
+      // 筛选有效参数的图片
+      const imagesWithParams = data.allImages.filter(img => hasValidParams(img))
+      
+      if (imagesWithParams.length > 0) {
+        // 如果有参数图片，只选择这些
+        console.log(`🖼️ 自动选中 ${imagesWithParams.length} 张有参数的图片`)
+        imagesWithParams.forEach(image => {
+          selectedImageIds.value.add(image.id)
+          console.log(`✅ 选中有参数图片 ID: ${image.id}`)
+        })
+      } else {
+        // 如果没有参数图片，选择前3张作为示例
+        const sampleImages = data.allImages.slice(0, Math.min(3, data.allImages.length))
+        console.log(`🖼️ 无参数图片，选中前 ${sampleImages.length} 张作为示例`)
+        sampleImages.forEach(image => {
+          selectedImageIds.value.add(image.id)
+          console.log(`✅ 选中示例图片 ID: ${image.id}`)
+        })
+      }
+      
       console.log(`📋 当前选中图片数量: ${selectedImageIds.value.size}`)
     }
     
@@ -773,7 +817,9 @@ const fetchModelInfo = async (forceRefresh = false) => {
     message.success(`模型信息获取成功${data?.allImages ? `，包含 ${data.allImages.length} 张图片` : ''}${forceRefresh ? ' (已清除缓存)' : ''}`)
   } catch (err: any) {
     error.value = err.message || '获取模型信息失败'
-    message.error(error.value)
+    if (error.value) {
+      message.error(error.value)
+    }
   } finally {
     loading.value = false
   }
@@ -836,6 +882,13 @@ const clearAllCaches = () => {
   }
   
   console.log('✅ 缓存清除完成')
+}
+
+// 检查图片是否有有效的完整参数
+const hasValidParams = (image: any) => {
+  return image?.params?.prompt && 
+         image.params.prompt.trim().length > 0 &&
+         (image.params.steps || image.params.cfgScale || image.params.sampler)
 }
 
 // 图片选择相关方法
@@ -987,9 +1040,9 @@ const executeSave = async () => {
  const savePromptsOnly = async () => {
    if (!modelData.value) return
    
-   const validImages = selectedImages.value.filter(img => img.params?.prompt)
+   const validImages = selectedImages.value.filter(img => hasValidParams(img))
    if (validImages.length === 0) {
-     throw new Error('没有找到有效的提示词')
+     throw new Error('没有找到有完整参数的图片')
    }
    
    let content = `# ${modelData.value.name} - 提示词集合\n\n`
@@ -1027,14 +1080,14 @@ const executeSave = async () => {
 const saveSeparatePrompts = async () => {
   if (!modelData.value) return
   
-  const validImages = selectedImages.value.filter(img => img.params?.prompt)
+  const validImages = selectedImages.value.filter(img => hasValidParams(img))
   if (validImages.length === 0) {
-    throw new Error('没有找到有效的提示词')
+    throw new Error('没有找到有完整参数的图片')
   }
   
   for (let i = 0; i < validImages.length; i++) {
     const image = validImages[i]
-    if (!image.params?.prompt) continue
+    if (!image?.params?.prompt) continue
     
     let content = `# ${modelData.value.name} - 图片 ${i + 1}\n\n`
     content += `**正向提示词:**\n\`\`\`\n${image.params.prompt}\`\`\`\n\n`

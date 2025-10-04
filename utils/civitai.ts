@@ -1,4 +1,4 @@
-import type { CivitaiModel } from '~/types/civitai'
+import type { CivitaiModel, CivitaiImage } from '~/types/civitai'
 
 const CIVITAI_API_BASE = 'https://civitai.com/api/v1/models'
 
@@ -13,14 +13,55 @@ function extractModelId(modelUrl: string): number | null {
     // 寻找路径中 'models' 后面的部分
     const modelsIndex = pathParts.findIndex(part => part === 'models')
     if (modelsIndex !== -1 && pathParts.length > modelsIndex + 1) {
-      const id = parseInt(pathParts[modelsIndex + 1], 10)
-      return isNaN(id) ? null : id
+      const idStr = pathParts[modelsIndex + 1]
+      if (idStr) {
+        const id = parseInt(idStr, 10)
+        return isNaN(id) ? null : id
+      }
     }
     return null
   } catch (err) {
     console.error('❌ URL 解析失败:', err)
     return null
   }
+}
+
+/**
+ * 绕过NSFW过滤，获取原始模型数据
+ */
+async function getCivitaiModelInfoUnfiltered(modelId: number): Promise<CivitaiModel | null> {
+  const strategies = [
+    `${CIVITAI_API_BASE}/${modelId}?nsfw=true&includeNsfw=true&_t=${Date.now()}`,
+    `${CIVITAI_API_BASE}/${modelId}?_t=${Date.now()}`,
+    `https://civitai.com/api/v1/models/${modelId}`
+  ]
+  
+  for (const apiUrl of strategies) {
+    try {
+      console.log(`🔍 尝试无过滤API: ${apiUrl}`)
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Cache-Control': 'no-cache',
+          'Referer': 'https://civitai.com/',
+          'X-Client-Token': 'anonymous'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`✅ 无过滤API成功获取模型数据`)
+        return data
+      }
+    } catch (err) {
+      console.warn(`⚠️ 无过滤API策略失败:`, err)
+    }
+  }
+  
+  return null
 }
 
 /**
@@ -39,7 +80,16 @@ export async function getCivitaiModelInfo(modelUrl: string): Promise<CivitaiMode
 
   console.log(`🔍 获取模型 ID: ${modelId}`)
 
-  // 重试机制
+  // 首先尝试无过滤API获取完整数据
+  console.log(`🎯 尝试无过滤API获取完整模型数据...`)
+  const unfilteredData = await getCivitaiModelInfoUnfiltered(modelId)
+  if (unfilteredData) {
+    console.log(`✅ 无过滤API成功获取模型数据: ${unfilteredData.name}`)
+    return unfilteredData
+  }
+
+  // 如果无过滤失败，使用标准重试机制
+  console.log(`⚠️ 无过滤API失败，使用标准API重试...`)
   const maxRetries = 3
   let lastError: any = null
   
@@ -160,11 +210,13 @@ export async function getCivitaiModelImages(modelId: number): Promise<CivitaiIma
     try {
       console.log(`🖼️ 获取模型图片 (尝试 ${attempt}/${maxRetries})...`)
       
-      // 添加时间戳来绕过缓存，根据用户设置决定是否禁用NSFW过滤
+      // 添加时间戳来绕过缓存，强制启用NSFW内容获取，确保获取完整图片
       const timestamp = Date.now()
-      const nsfwEnabled = typeof window !== 'undefined' ? localStorage.getItem('civitai-nsfw-enabled') === 'true' : false
-      const nsfwParam = nsfwEnabled ? '&nsfw=true' : ''
-      const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=50${nsfwParam}&_t=${timestamp}`
+      // 强制启用NSFW内容，不依赖用户设置
+      const nsfwParam = '&nsfw=true&includeNsfw=true'
+      // 增加更多参数确保获取完整图片集
+      const additionalParams = '&sort=Most+Reactions&period=AllTime&page=1'
+      const apiUrl = `https://civitai.com/api/v1/images?modelId=${modelId}&limit=200${nsfwParam}${additionalParams}&_t=${timestamp}`
       console.log(`🌐 请求图片API: ${apiUrl}`)
       
       const controller = new AbortController()
@@ -210,6 +262,101 @@ export async function getCivitaiModelImages(modelId: number): Promise<CivitaiIma
 }
 
 /**
+ * 增强版图片获取 - 专门用于获取完整的NSFW图片集
+ * @param modelId - 模型 ID
+ * @returns 完整图片数组，包含所有NSFW内容
+ */
+export async function getCivitaiModelImagesEnhanced(modelId: number): Promise<CivitaiImage[]> {
+  const maxRetries = 3
+  let lastError: any = null
+  let allImages: CivitaiImage[] = []
+  
+  // 使用多个策略获取图片
+  const strategies = [
+    // 策略1: 主要API，强制启用NSFW
+    {
+      name: 'primary',
+      url: `https://civitai.com/api/v1/images?modelId=${modelId}&limit=200&nsfw=true&includeNsfw=true&sort=Most+Reactions&period=AllTime&page=1&_t=${Date.now()}`
+    },
+    // 策略2: 备用API，使用不同参数
+    {
+      name: 'fallback', 
+      url: `https://civitai.com/api/v1/images?modelId=${modelId}&limit=100&nsfw=true&sort=Newest&_t=${Date.now()}`
+    },
+    // 策略3: 尝试无过滤API
+    {
+      name: 'unfiltered',
+      url: `https://civitai.com/api/v1/images?modelId=${modelId}&limit=300&_t=${Date.now()}`
+    }
+  ]
+  
+  for (const strategy of strategies) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🖼️ 使用${strategy.name}策略获取图片 (尝试 ${attempt}/${maxRetries})...`)
+        
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000)
+        
+        const response = await fetch(strategy.url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Referer': 'https://civitai.com/',
+            'X-Client-Token': 'anonymous',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'X-Request-Id': `req-${Date.now()}-${Math.random()}`
+          },
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        const images = data.items || []
+        console.log(`✅ ${strategy.name}策略成功获取 ${images.length} 张图片`)
+        
+        // 合并图片，去重
+        for (const img of images) {
+          if (!allImages.find(existing => existing.id === img.id)) {
+            allImages.push(img)
+          }
+        }
+        
+        // 如果这个策略成功获取了图片，继续下一个策略
+        break
+        
+      } catch (err: any) {
+        lastError = err
+        console.error(`❌ ${strategy.name}策略第 ${attempt}/${maxRetries} 次尝试失败:`, err.message)
+        
+        if (attempt < maxRetries) {
+          const delay = attempt * 1000
+          console.log(`⏳ 等待 ${delay}ms 后重试...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    }
+  }
+  
+  console.log(`🎯 总共获取到 ${allImages.length} 张图片 (包含NSFW内容)`)
+  
+  // 统计NSFW图片数量
+  const nsfwCount = allImages.filter(img => img.nsfw === true || (img.meta && img.meta.prompt && /nsfw|nude|naked|sex/i.test(img.meta.prompt))).length
+  console.log(`🔞 其中包含NSFW图片: ${nsfwCount} 张`)
+  
+  return allImages
+}
+
+/**
  * 从图片 meta 中提取有用的参数
  */
 export function extractImageParams(image: CivitaiImage) {
@@ -228,21 +375,48 @@ export function extractImageParams(image: CivitaiImage) {
 }
 
 /**
- * 获取模型的完整信息（包含图片和参数）
+ * 获取模型的完整信息（包含图片和参数）- 增强版，确保获取所有NSFW内容
  */
 export async function getCivitaiModelWithImages(modelUrl: string) {
   const modelInfo = await getCivitaiModelInfo(modelUrl)
   if (!modelInfo) return null
   
   try {
-    console.log(`🖼️ 尝试获取模型 ${modelInfo.id} 的图片...`)
-    const images = await getCivitaiModelImages(modelInfo.id)
-    const imagesWithParams = images.map(image => ({
+    console.log(`🖼️ 尝试获取模型 ${modelInfo.id} 的完整图片集 (包含NSFW)...`)
+    
+    // 优先使用增强版API获取完整图片
+    let images = await getCivitaiModelImagesEnhanced(modelInfo.id)
+    
+    // 如果增强版失败，回退到原版API
+    if (images.length === 0) {
+      console.log(`⚠️ 增强版API失败，尝试原版API...`)
+      images = await getCivitaiModelImages(modelInfo.id)
+    }
+    
+    // 同时从模型版本中提取图片作为补充
+    const modelVersionImages: CivitaiImage[] = []
+    if (modelInfo.modelVersions) {
+      for (const version of modelInfo.modelVersions) {
+        if (version.images) {
+          for (const img of version.images) {
+            // 确保图片有必要的字段
+            if (img.url && !images.find(existing => existing.id === img.id)) {
+              modelVersionImages.push(img)
+            }
+          }
+        }
+      }
+    }
+    
+    // 合并所有图片源
+    const allImages = [...images, ...modelVersionImages]
+    
+    const imagesWithParams = allImages.map(image => ({
       ...image,
       params: extractImageParams(image)
     }))
     
-    console.log(`✅ 成功获取 ${imagesWithParams.length} 张图片`)
+    console.log(`✅ 成功获取 ${imagesWithParams.length} 张图片 (API: ${images.length}, 模型版本: ${modelVersionImages.length})`)
     
     return {
       ...modelInfo,
