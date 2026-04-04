@@ -10,7 +10,7 @@
           'bg-yellow-400 text-white hover:bg-yellow-500': prompt.isFavorited,
           'bg-white/80 text-gray-600 hover:bg-yellow-100': !prompt.isFavorited
         }"
-        @click="$emit('toggleFavorite', prompt)"
+        @click.stop="$emit('toggleFavorite', prompt)"
       >
         <template #icon>
           <n-icon 
@@ -23,52 +23,18 @@
         </template>
       </n-button>
     </div>
-    <!-- 图片展示 -->
-    <div v-if="displayImages.length > 0" class="mb-4 relative">
-      <!-- 单图片显示（保持原有样式） -->
-      <div v-if="displayImages.length === 1" class="relative">
-        <NuxtImg 
-          :src="displayImages[0]" 
-          :alt="prompt.title"
-          :class="[
-            'w-full h-48 object-cover rounded-lg transition-all duration-300',
-            { 'blur-lg': shouldBlur }
-          ]"
-          loading="lazy"
-          placeholder
-          quality="80"
-          format="webp"
-          @error="handleImageError"
-        />
-        <!-- NSFW遮罩 -->
-        <div 
-          v-if="shouldBlur" 
-          class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center"
-        >
-          <div class="text-white text-center">
-            <div class="text-lg font-semibold mb-1">🔞</div>
-            <div class="text-sm">NSFW内容已隐藏</div>
-            <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 多图片网格显示 -->
-      <div v-else class="images-grid relative">
-        <div 
-          v-for="(image, index) in displayImages.slice(0, 4)" 
-          :key="index"
-          class="image-grid-item"
-          :class="{
-            'col-span-2': displayImages.length === 2 && index < 2,
-            'main-image': index === 0 && displayImages.length > 2
-          }"
-        >
+
+    <!-- 可点击内容区域（点击跳转到详情页） -->
+    <NuxtLink :to="`/prompt/${prompt.id}`" class="card-link">
+      <!-- 图片展示 -->
+      <div v-if="displayImages.length > 0" class="mb-4 relative">
+        <!-- 单图片显示（保持原有样式） -->
+        <div v-if="displayImages.length === 1" class="relative">
           <NuxtImg 
-            :src="image" 
-            :alt="`${prompt.title} - 图片 ${index + 1}`"
+            :src="displayImages[0]" 
+            :alt="prompt.title"
             :class="[
-              'w-full h-full object-cover rounded-lg transition-all duration-300',
+              'w-full h-48 object-cover rounded-lg transition-all duration-300',
               { 'blur-lg': shouldBlur }
             ]"
             loading="lazy"
@@ -77,79 +43,108 @@
             format="webp"
             @error="handleImageError"
           />
-          
-          <!-- 更多图片指示器 -->
+          <!-- NSFW遮罩 -->
           <div 
-            v-if="index === 3 && displayImages.length > 4"
-            class="more-images-overlay"
+            v-if="shouldBlur" 
+            class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center"
           >
-            <span class="more-count">+{{ displayImages.length - 4 }}</span>
+            <div class="text-white text-center">
+              <div class="text-lg font-semibold mb-1">🔞</div>
+              <div class="text-sm">NSFW内容已隐藏</div>
+              <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
+            </div>
           </div>
         </div>
         
-        <!-- 多图片NSFW遮罩 -->
-        <div 
-          v-if="shouldBlur" 
-          class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center z-10"
-        >
-          <div class="text-white text-center">
-            <div class="text-lg font-semibold mb-1">🔞</div>
-            <div class="text-sm">NSFW内容已隐藏</div>
-            <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
+        <!-- 多图片网格显示 -->
+        <div v-else class="images-grid relative">
+          <div 
+            v-for="(image, index) in displayImages.slice(0, 4)" 
+            :key="index"
+            class="image-grid-item"
+            :class="{
+              'col-span-2': displayImages.length === 2 && index < 2,
+              'main-image': index === 0 && displayImages.length > 2
+            }"
+          >
+            <NuxtImg 
+              :src="image" 
+              :alt="`${prompt.title} - 图片 ${index + 1}`"
+              :class="[
+                'w-full h-full object-cover rounded-lg transition-all duration-300',
+                { 'blur-lg': shouldBlur }
+              ]"
+              loading="lazy"
+              placeholder
+              quality="80"
+              format="webp"
+              @error="handleImageError"
+            />
+            
+            <!-- 更多图片指示器 -->
+            <div 
+              v-if="index === 3 && displayImages.length > 4"
+              class="more-images-overlay"
+            >
+              <span class="more-count">+{{ displayImages.length - 4 }}</span>
+            </div>
+          </div>
+          
+          <!-- 多图片NSFW遮罩 -->
+          <div 
+            v-if="shouldBlur" 
+            class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center z-10"
+          >
+            <div class="text-white text-center">
+              <div class="text-lg font-semibold mb-1">🔞</div>
+              <div class="text-sm">NSFW内容已隐藏</div>
+              <div class="text-xs opacity-75">请在设置中开启NSFW开关</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    
-    <!-- 标题 -->
-    <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">
-      {{ prompt.title }}
-    </h3>
-    
-    <!-- 内容预览 -->
-    <p class="text-gray-600 text-sm mb-4 line-clamp-3">
-      {{ prompt.content }}
-    </p>
-    
-    <!-- 标签 -->
-    <div v-if="parsedTags.length > 0" class="mb-4">
-      <n-space>
-        <n-tag 
-          v-for="tag in parsedTags" 
-          :key="tag"
-          size="small"
-          type="info"
-        >
-          {{ tag }}
-        </n-tag>
-      </n-space>
-    </div>
-    
-    <!-- 时间信息 -->
-    <div class="flex justify-between text-xs text-gray-400 mb-4">
-      <span>创建: {{ formatDate(prompt.createdAt) }}</span>
-      <span v-if="prompt.updatedAt !== prompt.createdAt" class="text-gray-300">
-        更新: {{ formatDate(prompt.updatedAt) }}
-      </span>
-    </div>
+      
+      <!-- 标题 -->
+      <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">
+        {{ prompt.title }}
+      </h3>
+      
+      <!-- 内容预览 -->
+      <p class="text-gray-600 text-sm mb-4 line-clamp-3">
+        {{ prompt.content }}
+      </p>
+      
+      <!-- 标签 -->
+      <div v-if="parsedTags.length > 0" class="mb-4">
+        <n-space>
+          <n-tag 
+            v-for="tag in parsedTags" 
+            :key="tag"
+            size="small"
+            type="info"
+          >
+            {{ tag }}
+          </n-tag>
+        </n-space>
+      </div>
+      
+      <!-- 时间信息 -->
+      <div class="flex justify-between text-xs text-gray-400 mb-4">
+        <span>创建: {{ formatDate(prompt.createdAt) }}</span>
+        <span v-if="prompt.updatedAt !== prompt.createdAt" class="text-gray-300">
+          更新: {{ formatDate(prompt.updatedAt) }}
+        </span>
+      </div>
+    </NuxtLink>
     
     <!-- 操作按钮 -->
     <div class="flex justify-between items-center">
-      <n-button-group>
-        <n-button size="small" @click="viewDetail">
-          <template #icon>
-            <n-icon :component="EyeIcon" />
-          </template>
-          查看
-        </n-button>
-        
-        <n-button size="small" @click="$emit('edit', prompt)">
-          <template #icon>
-            <n-icon :component="EditIcon" />
-          </template>
-          编辑
-        </n-button>
-      </n-button-group>
+      <n-button size="small" @click="$emit('edit', prompt)">
+        <template #icon>
+          <n-icon :component="EditIcon" />
+        </template>
+        编辑
+      </n-button>
       
       <n-popconfirm
         @positive-click="$emit('delete', prompt)"
@@ -171,8 +166,8 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { NCard, NTag, NSpace, NButton, NButtonGroup, NIcon, NPopconfirm } from 'naive-ui'
-import { Eye as EyeIcon, Create as EditIcon, Trash as DeleteIcon, Star as StarIcon, StarOutline as StarOutlineIcon } from '@vicons/ionicons5'
+import { NCard, NTag, NSpace, NButton, NIcon, NPopconfirm } from 'naive-ui'
+import { Create as EditIcon, Trash as DeleteIcon, Star as StarIcon, StarOutline as StarOutlineIcon } from '@vicons/ionicons5'
 
 // Props
 interface Prompt {
@@ -293,10 +288,6 @@ const handleImageError = (event: Event) => {
   img.style.display = 'none'
 }
 
-const viewDetail = () => {
-  navigateTo(`/prompt/${props.prompt.id}`)
-}
-
 // 生命周期钩子
 onMounted(() => {
   updateNsfwState()
@@ -316,6 +307,18 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+/* 卡片内容链接区域 */
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.card-link:hover h3 {
+  color: #4f46e5;
 }
 
 .line-clamp-2 {
